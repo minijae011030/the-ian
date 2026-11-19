@@ -6,8 +6,7 @@ type Piece = { x: number; y: number; z: number; sx: number; sy: number; sz: numb
 
 /** 사진 속 하얀 격자. 층마다 둘러진 슬래브 + 칸 사이 기둥, 옥상 위로 한 층 더 열린 격자 */
 function createPieces(): Piece[] {
-  const { width, depth, floors, floorHeight, frontBays, sideBays, slabThickness, columnWidth, crownHeight } =
-    BUILDING
+  const { width, depth, floors, floorHeight, frontBays, slabThickness, columnWidth, crownHeight } = BUILDING
   const pieces: Piece[] = []
   const top = BUILDING_HEIGHT + crownHeight
 
@@ -24,11 +23,6 @@ function createPieces(): Piece[] {
     for (const z of [depth / 2 - columnWidth / 2, -depth / 2 + columnWidth / 2]) {
       pieces.push({ x, y: top / 2, z, sx: cw, sy: top, sz: columnWidth })
     }
-  }
-  // 오른쪽 옆면 기둥
-  for (let i = 1; i < sideBays; i++) {
-    const z = -depth / 2 + (depth / sideBays) * i
-    pieces.push({ x: width / 2 - columnWidth / 2, y: top / 2, z, sx: columnWidth, sy: top, sz: columnWidth })
   }
   return pieces
 }
