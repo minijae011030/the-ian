@@ -1,4 +1,5 @@
 import { Canvas } from '@react-three/fiber'
+import { TheIan } from './scene/building/TheIan'
 import { CameraControls } from './scene/CameraControls'
 import { Ground } from './scene/Ground'
 import { Sky } from './scene/Sky'
@@ -14,11 +15,7 @@ export default function App() {
       <Ground />
       <Surroundings />
 
-      {/* 건물 자리 표시용. 다음 단계에서 파사드 그리드로 교체 */}
-      <mesh position={[0, 14, 0]}>
-        <boxGeometry args={[12, 28, 8]} />
-        <meshStandardMaterial color="#d9dde6" />
-      </mesh>
+      <TheIan />
 
       <CameraControls />
     </Canvas>
