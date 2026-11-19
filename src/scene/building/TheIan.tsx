@@ -1,7 +1,9 @@
+import { BackSide } from 'three'
 import { SIDEWALK_HEIGHT } from '../surroundings/layout'
 import { BUILDING, BUILDING_HEIGHT } from './config'
 import { Frame } from './Frame'
 import { Sign } from './Sign'
+import { RoomInterior } from './RoomInterior'
 import { Windows } from './Windows'
 
 const SIDE_WALL_INSET = 0.06
@@ -14,10 +16,11 @@ export function TheIan() {
 
   return (
     <group position-y={SIDEWALK_HEIGHT}>
-      {/* 창 뒤 몸통. 격자 사이가 깊어 보이게 어둡게 */}
+      {/* 창 뒤 몸통. 격자 사이가 깊어 보이게 어둡게.
+          안쪽 면(BackSide)만 그려서, 유리를 치운 방 안의 인테리어가 몸통에 가려지지 않게 함 */}
       <mesh position-y={BUILDING_HEIGHT / 2}>
         <boxGeometry args={[coreW, BUILDING_HEIGHT, coreD]} />
-        <meshStandardMaterial color="#2a3140" />
+        <meshStandardMaterial color="#2a3140" side={BackSide} />
       </mesh>
 
       {/* 동·서 옆면은 사진처럼 막힌 흰 벽.
@@ -30,6 +33,7 @@ export function TheIan() {
       ))}
 
       <Windows />
+      <RoomInterior />
       <Frame />
       <Sign />
     </group>

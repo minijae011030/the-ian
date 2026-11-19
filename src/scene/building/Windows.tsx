@@ -3,7 +3,8 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { CanvasTexture, Color, InstancedMesh, MeshBasicMaterial, Object3D, SRGBColorSpace } from 'three'
 import { environment } from '../environment'
 import { createRandom } from '../../lib/random'
-import { createWindowSlots, placeholderLit } from './config'
+import { setFocused, useFocused } from '../../state/focus'
+import { placeholderLit, SLOTS } from './config'
 
 const LIT = ['#ffe7bf', '#fff1d8', '#ffdca3', '#fff6e6']
 const SHOP = '#dfe8ff'
@@ -43,7 +44,8 @@ function createPaneTexture() {
 /** 칸마다 들어간 유리창. 켜진 방은 따뜻한 빛, 꺼진 방은 어두운 유리 */
 export function Windows() {
   const ref = useRef<InstancedMesh>(null)
-  const slots = useMemo(createWindowSlots, [])
+  const slots = SLOTS
+  const focused = useFocused()
   const lit = useMemo(() => placeholderLit(slots), [slots])
   const pane = useMemo(createPaneTexture, [])
 
@@ -62,7 +64,9 @@ export function Windows() {
     slots.forEach((s, i) => {
       dummy.position.set(...s.position)
       dummy.rotation.set(0, s.rotationY, 0)
-      dummy.scale.set(s.size[0], s.size[1], 1)
+      // 들여다보는 방은 유리를 치워서 안이 보이게
+      const hidden = s.id === focused
+      dummy.scale.set(hidden ? 0 : s.size[0], hidden ? 0 : s.size[1], 1)
       dummy.updateMatrix()
       mesh.setMatrixAt(i, dummy.matrix)
 
@@ -73,10 +77,25 @@ export function Windows() {
     })
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  }, [slots, lit])
+  }, [slots, lit, focused])
 
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, slots.length]}>
+    <instancedMesh
+      ref={ref}
+      args={[undefined, undefined, slots.length]}
+      onClick={(e) => {
+        // 드래그로 돌리다 손 뗀 건 클릭으로 치지 않음
+        if (e.delta > 4 || e.instanceId === undefined) return
+        e.stopPropagation()
+        const slot = slots[e.instanceId]
+        if (slot.floor === 0) return // 1층은 상가
+        setFocused(slot.id)
+      }}
+      onPointerOver={(e) => {
+        if (e.instanceId !== undefined && slots[e.instanceId].floor > 0) document.body.style.cursor = 'pointer'
+      }}
+      onPointerOut={() => (document.body.style.cursor = '')}
+    >
       <planeGeometry args={[1, 1]} />
       <meshBasicMaterial map={pane} toneMapped={false} />
     </instancedMesh>

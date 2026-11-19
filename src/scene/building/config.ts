@@ -1,4 +1,6 @@
+import { Vector3 } from 'three'
 import { createRandom } from '../../lib/random'
+import { SIDEWALK_HEIGHT } from '../surroundings/layout'
 
 /**
  * THE IAN 건물 치수.
@@ -72,4 +74,26 @@ export function createWindowSlots(): WindowSlot[] {
 export function placeholderLit(slots: WindowSlot[]) {
   const rand = createRandom(1030)
   return new Map(slots.map((s) => [s.id, s.floor === 0 || rand() < 0.72]))
+}
+
+/** 방 안쪽 깊이 (창에서 안쪽 벽까지) */
+export const ROOM_DEPTH = 3.2
+
+const slotCache = createWindowSlots()
+export const SLOTS = slotCache
+export const SLOT_BY_ID = new Map(slotCache.map((s) => [s.id, s]))
+
+/** 창이 바라보는 바깥 방향 (월드 기준) */
+export function slotNormal(slot: WindowSlot) {
+  return new Vector3(Math.sin(slot.rotationY), 0, Math.cos(slot.rotationY))
+}
+
+/** 창 중심의 월드 좌표 (건물 그룹이 보도 높이만큼 올라가 있는 것 반영) */
+export function slotWorldPosition(slot: WindowSlot) {
+  const [x, y, z] = slot.position
+  return new Vector3(x, y + SIDEWALK_HEIGHT, z)
+}
+
+export function formatSlot(slot: WindowSlot) {
+  return `${slot.floor + 1}층 ${slot.face === 'front' ? '남향' : '북향'} ${slot.bay + 1}호`
 }

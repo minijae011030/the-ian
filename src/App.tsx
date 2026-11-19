@@ -7,6 +7,7 @@ import { Plaza } from './scene/plaza'
 import { Sky } from './scene/Sky'
 import { Surroundings } from './scene/surroundings'
 import { Clock } from './ui/Clock'
+import { FocusOverlay } from './ui/FocusOverlay'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <CameraControls />
       </Canvas>
       <Clock />
+      <FocusOverlay />
     </>
   )
 }
