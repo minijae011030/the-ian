@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { Color, InstancedMesh, MeshBasicMaterial, Object3D } from 'three'
+import { BoxGeometry, Color, InstancedMesh, MeshBasicMaterial, Object3D } from 'three'
 import { environment } from '../environment'
 import {
   BLOCK_SIZE,
@@ -81,6 +81,9 @@ export function Streets() {
   const poleRef = useRef<InstancedMesh>(null)
   const headRef = useRef<InstancedMesh>(null)
 
+  // 바닥이 y=0에 오게 원점을 아래로 옮긴 상자 (onUpdate로 하면 리렌더마다 계속 밀려 올라감)
+  const groundedBox = useMemo(() => new BoxGeometry(1, 1, 1).translate(0, 0.5, 0), [])
+
   useInstances(sidewalkRef, sidewalks)
   useInstances(dashRef, dashes)
   useInstances(poleRef, poles)
@@ -98,16 +101,14 @@ export function Streets() {
 
   return (
     <>
-      <instancedMesh ref={sidewalkRef} args={[undefined, undefined, sidewalks.length]}>
-        <boxGeometry args={[1, 1, 1]} onUpdate={(g) => g.translate(0, 0.5, 0)} />
+      <instancedMesh ref={sidewalkRef} args={[groundedBox, undefined, sidewalks.length]}>
         <meshStandardMaterial color="#6b6f78" roughness={0.95} />
       </instancedMesh>
       <instancedMesh ref={dashRef} args={[undefined, undefined, dashes.length]}>
         <boxGeometry args={[1, 1, 1]} />
         <meshBasicMaterial color="#c9c4a8" />
       </instancedMesh>
-      <instancedMesh ref={poleRef} args={[undefined, undefined, poles.length]}>
-        <boxGeometry args={[1, 1, 1]} onUpdate={(g) => g.translate(0, 0.5, 0)} />
+      <instancedMesh ref={poleRef} args={[groundedBox, undefined, poles.length]}>
         <meshStandardMaterial color="#3a3e46" />
       </instancedMesh>
       <instancedMesh ref={headRef} args={[undefined, undefined, heads.length]}>

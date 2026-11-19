@@ -3,6 +3,7 @@ import { TheIan } from './scene/building/TheIan'
 import { CameraControls } from './scene/CameraControls'
 import { EnvironmentController } from './scene/EnvironmentController'
 import { Ground } from './scene/Ground'
+import { Plaza } from './scene/plaza'
 import { Sky } from './scene/Sky'
 import { Surroundings } from './scene/surroundings'
 import { Clock } from './ui/Clock'
@@ -18,6 +19,7 @@ export default function App() {
         <Ground />
         <Surroundings />
         <TheIan />
+        <Plaza />
         <CameraControls />
       </Canvas>
       <Clock />
