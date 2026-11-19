@@ -1,7 +1,9 @@
+import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { BoxGeometry, Color, InstancedMesh, Object3D } from 'three'
 import { createRandom, range } from '../../lib/random'
-import { createBuildingMaterial } from './buildingMaterial'
+import { environment } from '../environment'
+import { cityUniforms, createBuildingMaterial } from './buildingMaterial'
 import {
   BLOCK_SIZE,
   blockCenters,
@@ -116,6 +118,11 @@ export function CityBlocks() {
 
   useInstances(buildingRef, buildings)
   useInstances(rooftopRef, rooftops)
+
+  useFrame(() => {
+    cityUniforms.uLitScale.value = environment.cityLit
+    cityUniforms.uGlow.value = 0.3 + 0.7 * environment.darkness
+  })
 
   return (
     <>

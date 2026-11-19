@@ -1,5 +1,7 @@
+import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { CanvasTexture, Color, InstancedMesh, Object3D, SRGBColorSpace } from 'three'
+import { CanvasTexture, Color, InstancedMesh, MeshBasicMaterial, Object3D, SRGBColorSpace } from 'three'
+import { environment } from '../environment'
 import { createRandom } from '../../lib/random'
 import { createWindowSlots, placeholderLit } from './config'
 
@@ -44,6 +46,12 @@ export function Windows() {
   const slots = useMemo(createWindowSlots, [])
   const lit = useMemo(() => placeholderLit(slots), [slots])
   const pane = useMemo(createPaneTexture, [])
+
+  // 낮에는 실내 불빛이 바깥 햇빛에 묻혀서 덜 밝아 보이게
+  useFrame(() => {
+    const material = ref.current?.material as MeshBasicMaterial | undefined
+    if (material) material.color.setScalar(0.55 + 0.45 * environment.darkness)
+  })
 
   useLayoutEffect(() => {
     const mesh = ref.current

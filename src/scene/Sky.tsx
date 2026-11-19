@@ -1,4 +1,7 @@
+import { useFrame } from '@react-three/fiber'
+import { useMemo } from 'react'
 import { BackSide, Color } from 'three'
+import { environment } from './environment'
 
 const vertexShader = /* glsl */ `
   varying vec3 vWorldPosition;
@@ -21,13 +24,22 @@ const fragmentShader = /* glsl */ `
   }
 `
 
-type SkyProps = {
-  topColor?: string
-  horizonColor?: string
-}
+/** 그라데이션 하늘. 색은 서울 시간에 따라 environment에서 받아옴 */
+export function Sky() {
+  const uniforms = useMemo(
+    () => ({
+      topColor: { value: new Color() },
+      horizonColor: { value: new Color() },
+      exponent: { value: 0.6 },
+    }),
+    [],
+  )
 
-/** 사진 속 블루아워 하늘. 지금은 고정 색이고, 서울 시간 연동은 나중에 */
-export function Sky({ topColor = '#123a8c', horizonColor = '#6d93d6' }: SkyProps) {
+  useFrame(() => {
+    uniforms.topColor.value.copy(environment.top)
+    uniforms.horizonColor.value.copy(environment.horizon)
+  })
+
   return (
     <mesh>
       <sphereGeometry args={[900, 32, 16]} />
@@ -36,11 +48,7 @@ export function Sky({ topColor = '#123a8c', horizonColor = '#6d93d6' }: SkyProps
         depthWrite={false}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
-        uniforms={{
-          topColor: { value: new Color(topColor) },
-          horizonColor: { value: new Color(horizonColor) },
-          exponent: { value: 0.6 },
-        }}
+        uniforms={uniforms}
       />
     </mesh>
   )

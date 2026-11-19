@@ -1,5 +1,11 @@
 import { MeshStandardMaterial } from 'three'
 
+/** 시간대에 따라 바뀌는 값. 매 프레임 CityBlocks에서 갱신 */
+export const cityUniforms = {
+  uLitScale: { value: 1 }, // 불 켜진 창 비율 배수
+  uGlow: { value: 1 }, // 창 밝기 (낮엔 덜 빛남)
+}
+
 /**
  * 주변 건물 재질. 텍스처 대신 월드 좌표로 창문을 그려서
  * 건물 크기가 제각각이어도 층 높이·창 크기가 일정하게 유지됨.
@@ -11,6 +17,8 @@ export function createBuildingMaterial() {
   const material = new MeshStandardMaterial({ roughness: 0.85, metalness: 0.05 })
 
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.uLitScale = cityUniforms.uLitScale
+    shader.uniforms.uGlow = cityUniforms.uGlow
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -44,6 +52,8 @@ export function createBuildingMaterial() {
         varying vec3 vCityPos;
         varying vec3 vCityNormal;
         varying vec3 vCitySeed;
+        uniform float uLitScale;
+        uniform float uGlow;
 
         float cityHash(vec3 p) {
           return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
@@ -69,13 +79,13 @@ export function createBuildingMaterial() {
             float fy = fract(y / FLOOR_H);
             // varying 보간 오차가 해시에서 증폭돼 창문이 지글거리지 않게 정수로 반올림
             vec2 seed = floor(vCitySeed.xz + 0.5);
-            float litRatio = mix(0.12, 0.55, cityHash(vec3(seed, 1.0)));
+            float litRatio = mix(0.12, 0.55, cityHash(vec3(seed, 1.0))) * uLitScale;
 
             if (floorIdx < 1.0) {
               // 1층 상가
               float fx = fract(along / 4.0);
               windowMask = step(0.06, fx) * step(fx, 0.94) * step(0.12, fy) * step(fy, 0.9);
-              float on = step(cityHash(vec3(seed, floor(along / 4.0))), 0.8);
+              float on = step(cityHash(vec3(seed, floor(along / 4.0))), mix(0.25, 0.85, min(uLitScale, 1.0)));
               vec3 shop = mix(vec3(1.0, 0.9, 0.72), vec3(1.0, 0.7, 0.4), cityHash(vec3(seed, floor(along / 4.0) + 3.0)));
               windowGlow = shop * on * 1.1;
             } else {
@@ -94,7 +104,7 @@ export function createBuildingMaterial() {
             }
           }
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.06, 0.08, 0.12), windowMask);
-          windowGlow *= windowMask;
+          windowGlow *= windowMask * uGlow;
         }`,
       )
       .replace(

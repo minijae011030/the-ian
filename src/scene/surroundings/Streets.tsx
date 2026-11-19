@@ -1,5 +1,7 @@
+import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { InstancedMesh, Object3D } from 'three'
+import { Color, InstancedMesh, MeshBasicMaterial, Object3D } from 'three'
+import { environment } from '../environment'
 import {
   BLOCK_SIZE,
   blockCenters,
@@ -84,6 +86,16 @@ export function Streets() {
   useInstances(poleRef, poles)
   useInstances(headRef, heads)
 
+  // 가로등: 어두워지면 켜지고 낮엔 꺼진 회색
+  const lampOn = useMemo(() => new Color('#ffe2a8'), [])
+  const lampOff = useMemo(() => new Color('#8a8d93'), [])
+  useFrame(() => {
+    const material = headRef.current?.material as MeshBasicMaterial | undefined
+    if (!material) return
+    const on = environment.darkness > 0.45 ? 1 : 0
+    material.color.copy(lampOff).lerp(lampOn, on)
+  })
+
   return (
     <>
       <instancedMesh ref={sidewalkRef} args={[undefined, undefined, sidewalks.length]}>
@@ -100,7 +112,7 @@ export function Streets() {
       </instancedMesh>
       <instancedMesh ref={headRef} args={[undefined, undefined, heads.length]}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color="#ffe2a8" toneMapped={false} />
+        <meshBasicMaterial toneMapped={false} />
       </instancedMesh>
     </>
   )
