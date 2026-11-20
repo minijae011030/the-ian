@@ -1,33 +1,21 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useRef } from 'react'
 import type { MeshBasicMaterial, PointLight } from 'three'
-import { canvasTexture, repeating } from '../../lib/canvasTexture'
+import { floorTexture } from '../../items/floors'
 import type { RoomSize } from './types'
 
-function useFloorTexture() {
-  return useMemo(
-    () =>
-      repeating(
-        canvasTexture(128, 128, (ctx) => {
-          ctx.fillStyle = '#b48a62'
-          ctx.fillRect(0, 0, 128, 128)
-          for (let i = 0; i < 8; i++) {
-            ctx.fillStyle = i % 2 ? '#a97f58' : '#bb926a'
-            ctx.fillRect(0, i * 16, 128, 15)
-          }
-          ctx.fillStyle = 'rgba(0,0,0,0.15)'
-          for (let i = 0; i < 8; i++) ctx.fillRect((i * 53) % 128, i * 16, 2, 15)
-        }),
-        2,
-        2,
-      ),
-    [],
-  )
-}
-
 /** 벽·바닥·천장·조명. 원점 = 바닥 한가운데 */
-export function RoomShell({ size: { w, d, h }, lightOn, wall }: { size: RoomSize; lightOn: boolean; wall: string }) {
-  const floorTexture = useFloorTexture()
+export function RoomShell({
+  size: { w, d, h },
+  lightOn,
+  wall,
+  floor,
+}: {
+  size: RoomSize
+  lightOn: boolean
+  wall: string
+  floor: string
+}) {
   const ceilingLight = useRef<PointLight>(null)
   const ceilingDisc = useRef<MeshBasicMaterial>(null)
 
@@ -40,7 +28,7 @@ export function RoomShell({ size: { w, d, h }, lightOn, wall }: { size: RoomSize
     <>
       <mesh rotation-x={-Math.PI / 2}>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial map={floorTexture} roughness={0.8} />
+        <meshStandardMaterial map={floorTexture(floor)} roughness={0.8} />
       </mesh>
       <mesh rotation-x={Math.PI / 2} position-y={h}>
         <planeGeometry args={[w, d]} />

@@ -1,6 +1,6 @@
 import { Grid, OrbitControls, useHelper } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BoxHelper, type Group, Plane, Vector3 } from 'three'
 import type { ActivityKind } from '../data/rooms'
 import { CATALOG } from '../items/catalog'
@@ -9,10 +9,7 @@ import { findSpot } from '../scene/rooms/layoutData'
 import { PlacedItemMesh } from '../scene/rooms/PlacedItems'
 import { RoomShell } from '../scene/rooms/RoomShell'
 import type { LayoutData, PlacedItem, RoomSize } from '../scene/rooms/types'
-
-export const SNAP = 0.05
-// toFixed: 0.05 단위로 맞추다 생기는 -0.30000004 같은 부동소수 찌꺼기 제거
-const snap = (v: number) => Number((Math.round(v / SNAP) * SNAP).toFixed(2))
+import { findOverlaps, type Placement, placeAt } from './placement'
 
 type Props = {
   size: RoomSize
@@ -20,9 +17,13 @@ type Props = {
   selectedId: string | null
   previewKind: ActivityKind
   view: number
+  /** 팔레트에서 고른, 아직 안 놓은 아이템 */
+  placing: string | null
   onSelect: (id: string | null) => void
   onDragStart: () => void
   onMove: (id: string, patch: Partial<PlacedItem>) => void
+  /** keepPlacing: Shift 누르고 클릭 → 같은 아이템을 계속 놓음 */
+  onPlace: (itemId: string, at: Placement, keepPlacing: boolean) => void
 }
 
 /**
@@ -31,7 +32,12 @@ type Props = {
  */
 export function EditorScene(props: Props) {
   return (
-    <Canvas orthographic camera={{ zoom: 140, near: -100, far: 100 }} onPointerMissed={() => props.onSelect(null)}>
+    <Canvas
+      orthographic
+      camera={{ zoom: 140, near: -100, far: 100 }}
+      onPointerMissed={() => !props.placing && props.onSelect(null)}
+      style={{ cursor: props.placing ? 'copy' : 'default' }}
+    >
       <color attach="background" args={['#0d1017']} />
       <ambientLight intensity={0.9} />
       <directionalLight position={[3, 6, 4]} intensity={1.2} />
@@ -40,12 +46,27 @@ export function EditorScene(props: Props) {
   )
 }
 
-function Scene({ size, layout, selectedId, previewKind, view, onSelect, onDragStart, onMove }: Props) {
+function Scene({
+  size,
+  layout,
+  selectedId,
+  previewKind,
+  view,
+  placing,
+  onSelect,
+  onDragStart,
+  onMove,
+  onPlace,
+}: Props) {
   const controls = useRef<React.ComponentRef<typeof OrbitControls>>(null)
   const camera = useThree((s) => s.camera)
   const raycaster = useThree((s) => s.raycaster)
   const pointer = useThree((s) => s.pointer)
-  const drag = useRef<{ item: PlacedItem; plane: Plane; offset: Vector3; axis: 'xz' | 'xy' | 'zy' } | null>(null)
+  const gl = useThree((s) => s.gl)
+  const drag = useRef<{ item: PlacedItem; offset?: Vector3 } | null>(null)
+  const [ghost, setGhost] = useState<Placement | null>(null)
+  const ghostRef = useRef<Placement | null>(null)
+  const overlaps = useMemo(() => findOverlaps(layout), [layout])
 
   // 시점: 45도씩 돌린 4방향 중 하나
   useEffect(() => {
@@ -67,54 +88,59 @@ function Scene({ size, layout, selectedId, previewKind, view, onSelect, onDragSt
     return () => window.removeEventListener('pointerup', up)
   }, [])
 
-  // 드래그 중: 마우스 광선이 이동 평면과 만나는 점으로 아이템을 옮김
+  // 놓기 모드: 캔버스 클릭 = 미리보기 자리에 놓기
+  useEffect(() => {
+    if (!placing) {
+      setGhost(null)
+      ghostRef.current = null
+      return
+    }
+    const down = (e: PointerEvent) => {
+      if (e.button !== 0 || !ghostRef.current) return
+      onPlace(placing, ghostRef.current, e.shiftKey)
+    }
+    gl.domElement.addEventListener('pointerdown', down)
+    return () => gl.domElement.removeEventListener('pointerdown', down)
+  }, [placing, gl, onPlace])
+
   useFrame(() => {
-    const d = drag.current
-    if (!d) return
+    if (!drag.current && !placing) return
     raycaster.setFromCamera(pointer, camera)
-    const hit = new Vector3()
-    if (!raycaster.ray.intersectPlane(d.plane, hit)) return
-    hit.sub(d.offset)
-    const clampX = (v: number) => Math.max(-size.w / 2, Math.min(size.w / 2, snap(v)))
-    const clampZ = (v: number) => Math.max(-size.d / 2, Math.min(size.d / 2, snap(v)))
-    const clampY = (v: number) => Math.max(0, Math.min(size.h, snap(v)))
-    const patch: Partial<PlacedItem> =
-      d.axis === 'xz'
-        ? { x: clampX(hit.x), z: clampZ(hit.z) }
-        : d.axis === 'xy'
-          ? { x: clampX(hit.x), y: clampY(hit.y) }
-          : { z: clampZ(hit.z), y: clampY(hit.y) }
-    onMove(d.item.id, patch)
+
+    if (placing) {
+      const at = placeAt(placing, raycaster.ray, layout, size)
+      const changed = JSON.stringify(at) !== JSON.stringify(ghostRef.current)
+      ghostRef.current = at
+      if (changed) setGhost(at)
+      return
+    }
+
+    const d = drag.current!
+    const at = placeAt(d.item.item, raycaster.ray, layout, size, { excludeId: d.item.id, offset: d.offset })
+    if (at) onMove(d.item.id, at)
   })
 
   const startDrag = (item: PlacedItem) => {
-    const place = CATALOG[item.item]?.place
-    // 벽 아이템은 벽면을 따라, 나머지는 바닥과 평행하게 움직임
-    let axis: 'xz' | 'xy' | 'zy' = 'xz'
-    let plane = new Plane(new Vector3(0, 1, 0), -item.y)
-    if (place === 'wall') {
-      const r = ((item.rot % 360) + 360) % 360
-      if (r === 90 || r === 270) {
-        axis = 'zy'
-        plane = new Plane(new Vector3(1, 0, 0), -item.x)
-      } else {
-        axis = 'xy'
-        plane = new Plane(new Vector3(0, 0, 1), -item.z)
+    // 바닥 가구는 잡은 지점과 중심 사이 간격을 유지 (안 그러면 잡는 순간 중심이 마우스로 튐)
+    let offset: Vector3 | undefined
+    if (CATALOG[item.item]?.place === 'floor') {
+      const hit = new Vector3()
+      if (raycaster.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), 0), hit)) {
+        offset = hit.sub(new Vector3(item.x, 0, item.z))
       }
     }
-    const onPlane = new Vector3()
-    raycaster.ray.intersectPlane(plane, onPlane)
-    drag.current = { item, plane, axis, offset: onPlane.sub(new Vector3(item.x, item.y, item.z)) }
+    drag.current = { item, offset }
     if (controls.current) controls.current.enabled = false
     onDragStart()
   }
 
   const spot = findSpot(layout, previewKind)
+  const lit = previewKind !== 'sleep' && previewKind !== 'away'
 
   return (
     <>
       <OrbitControls ref={controls} enableRotate={false} enableDamping={false} screenSpacePanning minZoom={60} maxZoom={400} />
-      <RoomShell size={size} lightOn={previewKind !== 'sleep' && previewKind !== 'away'} wall={layout.wall} />
+      <RoomShell size={size} lightOn={lit} wall={layout.wall} floor={layout.floor} />
       <Grid
         args={[size.w, size.d]}
         position-y={0.003}
@@ -132,17 +158,27 @@ function Scene({ size, layout, selectedId, previewKind, view, onSelect, onDragSt
         return (
           <Selectable
             key={placed.id}
-            selected={placed.id === selectedId}
-            dimmed={!!hidden}
+            outline={placed.id === selectedId ? '#e0a43a' : overlaps.has(placed.id) ? '#ff4d4d' : null}
+            opacity={hidden ? 0.3 : 1}
             onPointerDown={() => {
+              if (placing) return
               onSelect(placed.id)
               startDrag(placed)
             }}
           >
-            <PlacedItemMesh placed={placed} lit={previewKind !== 'sleep'} />
+            <PlacedItemMesh placed={placed} lit={lit} />
           </Selectable>
         )
       })}
+
+      {placing && ghost && (
+        <Selectable outline="#8ab4ff" opacity={0.55} onPointerDown={() => {}}>
+          <PlacedItemMesh
+            placed={{ id: '__ghost', item: placing, rot: 0, ...ghost, variant: CATALOG[placing]?.variants[0] }}
+            lit={lit}
+          />
+        </Selectable>
+      )}
 
       {spot && (
         <group position={spot.position} rotation-y={spot.rotationY}>
@@ -154,28 +190,29 @@ function Scene({ size, layout, selectedId, previewKind, view, onSelect, onDragSt
 }
 
 function Selectable({
-  selected,
-  dimmed,
+  outline,
+  opacity,
   onPointerDown,
   children,
 }: {
-  selected: boolean
-  dimmed: boolean
+  outline: string | null
+  opacity: number
   onPointerDown: () => void
   children: React.ReactNode
 }) {
   const ref = useRef<Group>(null)
-  useHelper(selected ? (ref as React.RefObject<Group>) : null, BoxHelper, '#e0a43a')
+  useHelper(outline ? (ref as React.RefObject<Group>) : null, BoxHelper, outline ?? undefined)
 
   useEffect(() => {
-    // when 조건에 안 맞는 아이템(예: 밥그릇)은 반투명하게
+    // when 조건에 안 맞는 아이템(예: 밥그릇)이나 놓기 전 미리보기는 반투명하게
     ref.current?.traverse((o) => {
-      const m = (o as { material?: { transparent: boolean; opacity: number } }).material
+      const m = (o as { material?: { transparent: boolean; opacity: number; depthWrite: boolean } }).material
       if (!m) return
-      m.transparent = dimmed
-      m.opacity = dimmed ? 0.3 : 1
+      m.transparent = opacity < 1
+      m.opacity = opacity
+      m.depthWrite = opacity >= 1
     })
-  }, [dimmed])
+  })
 
   return (
     <group

@@ -31,6 +31,10 @@ export type ItemDef = {
   place: 'floor' | 'wall' | 'surface'
   /** 바닥에서 차지하는 크기 [폭, 깊이] (회전 0 기준) */
   footprint: [number, number]
+  /** 위에 소품을 올릴 수 있으면 그 윗면 높이 (책상 0.74 등) */
+  top?: number
+  /** 바닥에 깔리는 납작한 것 (러그). 다른 가구랑 겹쳐도 괜찮음 */
+  flat?: boolean
   /** 첫 번째가 기본값 */
   variants: string[]
   render: (p: { variant: string; lit: boolean }) => React.ReactNode
@@ -59,6 +63,7 @@ export const CATALOG: Record<string, ItemDef> = {
     category: 'furniture',
     place: 'floor',
     footprint: [0.95, 2.05],
+    top: 0.55,
     variants: Object.keys(BLANKETS),
     render: ({ variant }) => <Bed blanket={BLANKETS[variant]} />,
     uses: {
@@ -71,6 +76,7 @@ export const CATALOG: Record<string, ItemDef> = {
     category: 'furniture',
     place: 'floor',
     footprint: [1.2, 0.55],
+    top: 0.74,
     variants: ['short', 'long'],
     render: ({ variant }) => <Desk width={variant === 'long' ? 1.3 : 1.1} />,
   },
@@ -94,6 +100,7 @@ export const CATALOG: Record<string, ItemDef> = {
     category: 'furniture',
     place: 'floor',
     footprint: [0.7, 0.36],
+    top: 0.64,
     variants: ['white'],
     render: () => <Vanity />,
     uses: { skincare: { pose: 'stand', hands: 'face', at: [0, 0, 0.52], facing: 180 } },
@@ -111,6 +118,7 @@ export const CATALOG: Record<string, ItemDef> = {
     category: 'decor',
     place: 'floor',
     footprint: [1.1, 1.0],
+    flat: true,
     variants: Object.keys(RUGS),
     render: ({ variant }) => <Rug size={[1.1, 1.0]} color={RUGS[variant]} />,
     uses: { exercise: { pose: 'stand', hands: 'down', at: [0, 0, 0], facing: 0 } },

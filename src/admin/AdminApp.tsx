@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ActivityKind, ROOMS } from '../data/rooms'
 import { CATALOG, type ItemDef } from '../items/catalog'
+import { FLOORS } from '../items/floors'
 import { defaultLayout, fetchLayout, roomSize } from '../scene/rooms/layoutData'
 import type { LayoutData, PlacedItem } from '../scene/rooms/types'
 import { EditorScene } from './EditorScene'
+import type { Placement } from './placement'
 import { commitFiles, type GithubSettings, loadSettings, readFile, saveSettings } from './github'
 
 const KINDS: { kind: ActivityKind; label: string }[] = [
@@ -43,6 +45,7 @@ export function AdminApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<ActivityKind>('work')
   const [view, setView] = useState(0)
+  const [placing, setPlacing] = useState<string | null>(null)
   const [settings, setSettings] = useState<GithubSettings>(loadSettings)
   const [status, setStatus] = useState<{ text: string; error?: boolean; url?: string } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -114,21 +117,19 @@ export function AdminApp() {
     return `${base}-${n}`
   }
 
-  const addItem = (itemId: string) => {
-    const def = CATALOG[itemId]
-    const placed: PlacedItem = {
-      id: uniqueId(itemId),
-      item: itemId,
-      x: 0,
-      // 벽 아이템은 안쪽 벽 눈높이, 소품은 책상 높이, 나머지는 바닥
-      y: def.place === 'wall' ? round(size.h * 0.6) : def.place === 'surface' ? 0.74 : 0,
-      z: def.place === 'wall' ? round(-size.d / 2 + 0.01) : 0,
-      rot: 0,
-      variant: def.variants[0],
-    }
-    update((l) => ({ ...l, items: [...l.items, placed] }))
-    setSelectedId(placed.id)
-  }
+  /** 놓기 모드에서 클릭한 자리에 아이템 추가. Shift 누른 채 클릭하면 같은 걸 계속 놓을 수 있음 */
+  const placeItem = useCallback(
+    (itemId: string, at: Placement, keepPlacing: boolean) => {
+      const def = CATALOG[itemId]
+      let n = 1
+      while (layout?.items.some((it) => it.id === `${itemId}-${n}`)) n++
+      const placed: PlacedItem = { id: `${itemId}-${n}`, item: itemId, rot: 0, ...at, variant: def.variants[0] }
+      update((l) => ({ ...l, items: [...l.items, placed] }))
+      setSelectedId(placed.id)
+      if (!keepPlacing) setPlacing(null)
+    },
+    [layout, update],
+  )
 
   const removeSelected = useCallback(() => {
     if (!selectedId) return
@@ -144,6 +145,11 @@ export function AdminApp() {
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         undo()
+        return
+      }
+      if (e.key === 'Escape') {
+        setPlacing(null)
+        setSelectedId(null)
         return
       }
       if (!selected) return
@@ -167,8 +173,6 @@ export function AdminApp() {
         const copy = { ...selected, id: uniqueId(selected.item), x: round(selected.x + 0.2) }
         update((l) => ({ ...l, items: [...l.items, copy] }))
         setSelectedId(copy.id)
-      } else if (e.key === 'Escape') {
-        setSelectedId(null)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -239,7 +243,12 @@ export function AdminApp() {
             <h2>{CATEGORY_LABEL[category as ItemDef['category']]}</h2>
             <div className="chips">
               {items.map(([id, def]) => (
-                <button key={id} onClick={() => addItem(id)} disabled={!layout}>
+                <button
+                  key={id}
+                  className={placing === id ? 'active' : ''}
+                  onClick={() => setPlacing(placing === id ? null : id)}
+                  disabled={!layout}
+                >
                   {def.name}
                 </button>
               ))}
@@ -256,6 +265,8 @@ export function AdminApp() {
             selectedId={selectedId}
             previewKind={previewKind}
             view={view}
+            placing={placing}
+            onPlace={placeItem}
             onSelect={setSelectedId}
             onDragStart={remember}
             onMove={(id, patch) => patchItem(id, patch, false)}
@@ -267,7 +278,7 @@ export function AdminApp() {
           <button onClick={undo}>되돌리기</button>
         </div>
         <div className="keys">
-          드래그 이동 · R 회전 · 방향키 미세조정(Shift 크게) · ⌘D 복제 · Delete 삭제 · ⌘Z 되돌리기 · 오른쪽 드래그 화면 이동
+          {placing ? '클릭해서 놓기 · Shift+클릭 여러 개 · Esc 취소 · ' : ''}드래그 이동 · R 회전 · 방향키 미세조정(Shift 크게) · ⌘D 복제 · Delete 삭제 · ⌘Z 되돌리기 · 오른쪽 드래그 화면 이동
         </div>
       </main>
 
@@ -287,6 +298,18 @@ export function AdminApp() {
           <div className="field">
             <label>벽 색</label>
             <input type="color" value={layout.wall} onChange={(e) => update((l) => ({ ...l, wall: e.target.value }))} />
+          </div>
+        )}
+        {layout && (
+          <div className="field">
+            <label>바닥</label>
+            <select value={layout.floor} onChange={(e) => update((l) => ({ ...l, floor: e.target.value }))}>
+              {Object.entries(FLOORS).map(([id, f]) => (
+                <option key={id} value={id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 

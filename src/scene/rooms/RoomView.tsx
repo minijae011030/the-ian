@@ -38,7 +38,7 @@ function FocusedRoom({ roomId }: { roomId: string }) {
   return (
     <group position={interiorCenter} rotation-y={rotationY}>
       <group position={[0, -size.h / 2, -size.d / 2 - 0.02]}>
-        <RoomShell size={size} lightOn={lightOn} wall={layout?.wall ?? '#efe9df'} />
+        <RoomShell size={size} lightOn={lightOn} wall={layout?.wall ?? '#efe9df'} floor={layout?.floor ?? 'wood'} />
         {layout && <PlacedItems items={layout.items} kind={kind} lit={lightOn} />}
         {spot && (
           <group position={spot.position} rotation-y={spot.rotationY}>
