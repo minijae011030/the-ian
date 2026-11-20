@@ -1,14 +1,15 @@
 import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { CanvasTexture, Color, InstancedMesh, MeshBasicMaterial, Object3D, SRGBColorSpace } from 'three'
-import { environment } from '../environment'
-import { createRandom } from '../../lib/random'
 import { setFocused, useFocused } from '../../state/focus'
-import { placeholderLit, SLOTS } from './config'
+import { environment } from '../environment'
+import { SLOTS } from './config'
+import { currentActivity, isLightOn, ROOM_BY_SLOT } from './rooms'
 
-const LIT = ['#ffe7bf', '#fff1d8', '#ffdca3', '#fff6e6']
+const LIT = '#ffe2b3'
 const SHOP = '#dfe8ff'
-const DARK = '#1b2433'
+const DARK = '#1b2433' // 불 꺼진 방
+const VACANT = '#141b27' // 아직 안 열린 방
 
 /**
  * 창 한 칸 텍스처. 위쪽(천장 조명)이 더 밝은 그라데이션 + 창틀·세로 멀리언·난간 줄.
@@ -41,58 +42,74 @@ function createPaneTexture() {
   return t
 }
 
-/** 칸마다 들어간 유리창. 켜진 방은 따뜻한 빛, 꺼진 방은 어두운 유리 */
+/**
+ * 칸마다 들어간 유리창.
+ * - 방 데이터가 있는 칸: 그 방 일과에 따라 불이 켜지고 꺼짐 (자거나 외출하면 꺼짐)
+ * - 방 데이터가 없는 칸: 아직 안 열린 방이라 어두움
+ * - 1층: 상가
+ */
 export function Windows() {
   const ref = useRef<InstancedMesh>(null)
-  const slots = SLOTS
   const focused = useFocused()
-  const lit = useMemo(() => placeholderLit(slots), [slots])
   const pane = useMemo(createPaneTexture, [])
+  const lastMinute = useRef(-1)
 
-  // 낮에는 실내 불빛이 바깥 햇빛에 묻혀서 덜 밝아 보이게
-  useFrame(() => {
-    const material = ref.current?.material as MeshBasicMaterial | undefined
-    if (material) material.color.setScalar(0.55 + 0.45 * environment.darkness)
-  })
-
+  // 위치: 들여다보는 방은 유리를 치워서 안이 보이게
   useLayoutEffect(() => {
     const mesh = ref.current
     if (!mesh) return
-    const rand = createRandom(7)
     const dummy = new Object3D()
-    const color = new Color()
-    slots.forEach((s, i) => {
+    SLOTS.forEach((s, i) => {
+      const hidden = focused !== null && ROOM_BY_SLOT.get(s.id)?.id === focused
       dummy.position.set(...s.position)
       dummy.rotation.set(0, s.rotationY, 0)
-      // 들여다보는 방은 유리를 치워서 안이 보이게
-      const hidden = s.id === focused
       dummy.scale.set(hidden ? 0 : s.size[0], hidden ? 0 : s.size[1], 1)
       dummy.updateMatrix()
       mesh.setMatrixAt(i, dummy.matrix)
-
-      if (s.floor === 0) color.set(SHOP)
-      else if (lit.get(s.id)) color.set(LIT[Math.floor(rand() * LIT.length)])
-      else color.set(DARK)
-      mesh.setColorAt(i, color)
     })
     mesh.instanceMatrix.needsUpdate = true
+  }, [focused])
+
+  useFrame(() => {
+    const mesh = ref.current
+    if (!mesh) return
+
+    // 낮에는 실내 불빛이 바깥 햇빛에 묻혀서 덜 밝아 보이게
+    ;(mesh.material as MeshBasicMaterial).color.setScalar(0.55 + 0.45 * environment.darkness)
+
+    // 불 켜짐은 1분에 한 번만 다시 계산
+    const minute = Math.floor(environment.hour * 60)
+    if (minute === lastMinute.current) return
+    lastMinute.current = minute
+
+    const color = new Color()
+    SLOTS.forEach((s, i) => {
+      const room = ROOM_BY_SLOT.get(s.id)
+      if (s.floor === 0) color.set(SHOP)
+      else if (!room) color.set(VACANT)
+      else color.set(isLightOn(currentActivity(room, environment.hour)) ? LIT : DARK)
+      mesh.setColorAt(i, color)
+    })
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  }, [slots, lit, focused])
+  })
+
+  const roomAt = (instanceId: number | undefined) =>
+    instanceId === undefined ? undefined : ROOM_BY_SLOT.get(SLOTS[instanceId].id)
 
   return (
     <instancedMesh
       ref={ref}
-      args={[undefined, undefined, slots.length]}
+      args={[undefined, undefined, SLOTS.length]}
       onClick={(e) => {
         // 드래그로 돌리다 손 뗀 건 클릭으로 치지 않음
-        if (e.delta > 4 || e.instanceId === undefined) return
+        if (e.delta > 4) return
+        const room = roomAt(e.instanceId)
+        if (!room) return
         e.stopPropagation()
-        const slot = slots[e.instanceId]
-        if (slot.floor === 0) return // 1층은 상가
-        setFocused(slot.id)
+        setFocused(room.id)
       }}
-      onPointerOver={(e) => {
-        if (e.instanceId !== undefined && slots[e.instanceId].floor > 0) document.body.style.cursor = 'pointer'
+      onPointerMove={(e) => {
+        document.body.style.cursor = roomAt(e.instanceId) ? 'pointer' : ''
       }}
       onPointerOut={() => (document.body.style.cursor = '')}
     >

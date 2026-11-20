@@ -1,5 +1,4 @@
 import { Vector3 } from 'three'
-import { createRandom } from '../../lib/random'
 import { SIDEWALK_HEIGHT } from '../surroundings/layout'
 
 /**
@@ -70,12 +69,6 @@ export function createWindowSlots(): WindowSlot[] {
   return slots
 }
 
-/** 방 데이터 붙기 전까지 임시로 쓰는 불 켜짐 상태. 사진처럼 대부분 켜져 있게 */
-export function placeholderLit(slots: WindowSlot[]) {
-  const rand = createRandom(1030)
-  return new Map(slots.map((s) => [s.id, s.floor === 0 || rand() < 0.72]))
-}
-
 /** 방 안쪽 깊이 (창에서 안쪽 벽까지) */
 export const ROOM_DEPTH = 3.2
 
@@ -92,8 +85,4 @@ export function slotNormal(slot: WindowSlot) {
 export function slotWorldPosition(slot: WindowSlot) {
   const [x, y, z] = slot.position
   return new Vector3(x, y + SIDEWALK_HEIGHT, z)
-}
-
-export function formatSlot(slot: WindowSlot) {
-  return `${slot.floor + 1}층 ${slot.face === 'front' ? '남향' : '북향'} ${slot.bay + 1}호`
 }

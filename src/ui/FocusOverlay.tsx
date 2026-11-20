@@ -1,19 +1,26 @@
-import { useEffect } from 'react'
-import { SLOT_BY_ID, formatSlot } from '../scene/building/config'
+import { useEffect, useState } from 'react'
+import { getSeoulHour } from '../lib/seoulTime'
+import { currentActivity, ROOM_BY_ID } from '../scene/building/rooms'
 import { setFocused, useFocused } from '../state/focus'
 
-/** 방 들여다보는 중일 때 위에 뜨는 방 이름 + 나가기. Esc로도 나감 */
+/** 방 들여다보는 중일 때 아래에 뜨는 방 이름 · 지금 하는 일 · 나가기. Esc로도 나감 */
 export function FocusOverlay() {
   const focused = useFocused()
-  const slot = focused ? SLOT_BY_ID.get(focused) : undefined
+  const room = focused ? ROOM_BY_ID.get(focused) : undefined
+  const [hour, setHour] = useState(getSeoulHour)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setFocused(null)
+    const id = setInterval(() => setHour(getSeoulHour()), 1000)
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener('keydown', onKey)
+    }
   }, [])
 
-  if (!slot) return null
+  if (!room) return null
+  const activity = currentActivity(room, hour)
 
   return (
     <div
@@ -31,9 +38,16 @@ export function FocusOverlay() {
         backdropFilter: 'blur(8px)',
         color: '#fff',
         font: '500 14px/1 "Helvetica Neue", "Apple SD Gothic Neo", sans-serif',
+        whiteSpace: 'nowrap',
       }}
     >
-      <span>{formatSlot(slot)}</span>
+      <span>
+        <b style={{ fontWeight: 700 }}>{room.name}</b>
+        <span style={{ opacity: 0.55, margin: '0 8px' }}>·</span>
+        {room.floor}층
+        <span style={{ opacity: 0.55, margin: '0 8px' }}>·</span>
+        <span style={{ opacity: 0.85 }}>{activity.label}</span>
+      </span>
       <button
         onClick={() => setFocused(null)}
         style={{

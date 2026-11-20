@@ -4,11 +4,13 @@ import { useEffect, useRef } from 'react'
 import { MathUtils, Vector3 } from 'three'
 import { registerVerticalMove, setViewFloor } from '../state/camera'
 import { useFocused } from '../state/focus'
-import { BUILDING, BUILDING_HEIGHT, ROOM_DEPTH, SLOT_BY_ID, slotNormal, slotWorldPosition } from './building/config'
+import { BUILDING, BUILDING_HEIGHT, ROOM_DEPTH } from './building/config'
+import { ROOM_BY_ID, roomGeometry } from './building/rooms'
 import { SIDEWALK_HEIGHT } from './surroundings/layout'
 
 const HOME_TARGET = new Vector3(0, 14, 0)
-const VIEW_DISTANCE = 2.4 // 방 줌인할 때 창 밖 몇 m 앞에 설지
+/** 방 줌인할 때 창 밖 몇 m 앞에 설지. 넓은 방일수록 뒤로 물러나서 방 전체가 보이게 */
+const viewDistance = (width: number) => 1.1 + width * 0.75
 const TOP_Y = SIDEWALK_HEIGHT + BUILDING_HEIGHT + BUILDING.crownHeight
 const TARGET_BOUNDS = { xz: 14, minY: 1.5, maxY: TOP_Y }
 const RECENTER_FROM = 45 // 이보다 멀리 빠지면 시선을 건물 중심으로 천천히 되돌림
@@ -59,16 +61,15 @@ export function CameraControls() {
     if (!controls) return
 
     if (focused !== lastFocused.current) {
-      const slot = focused ? SLOT_BY_ID.get(focused) : undefined
-      if (slot) {
+      const room = focused ? ROOM_BY_ID.get(focused) : undefined
+      if (room) {
         if (!lastFocused.current) {
           saved.current = { position: camera.position.clone(), target: controls.target.clone() }
         }
-        const windowPos = slotWorldPosition(slot)
-        const normal = slotNormal(slot)
+        const { worldCenter, normal, width } = roomGeometry(room)
         flight.current = {
-          position: windowPos.clone().addScaledVector(normal, VIEW_DISTANCE),
-          target: windowPos.clone().addScaledVector(normal, -ROOM_DEPTH * 0.55),
+          position: worldCenter.clone().addScaledVector(normal, viewDistance(width)),
+          target: worldCenter.clone().addScaledVector(normal, -ROOM_DEPTH * 0.55),
         }
         verticalGoal.current = null
         controls.enabled = false

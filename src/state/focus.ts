@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- * 지금 들여다보고 있는 방(창 슬롯 id). null이면 건물 밖에서 보는 중.
+ * 지금 들여다보고 있는 방 id (data/rooms.ts). null이면 건물 밖에서 보는 중.
  * 3D 씬(카메라·창문)과 DOM UI(나가기 버튼)가 같이 써야 해서 작은 외부 스토어로 둠
  */
 let focused: string | null = null

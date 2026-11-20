@@ -1,18 +1,32 @@
-import { useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { useMemo, useRef } from 'react'
+import type { MeshBasicMaterial, PointLight } from 'three'
 import { canvasTexture, repeating } from '../../lib/canvasTexture'
 import { useFocused } from '../../state/focus'
-import { BUILDING, ROOM_DEPTH, SLOT_BY_ID } from './config'
+import { environment } from '../environment'
+import { BUILDING, ROOM_DEPTH } from './config'
+import { currentActivity, isLightOn, ROOM_BY_ID, roomGeometry } from './rooms'
 
 const WALL = '#efe9df'
 const WOOD = '#b98b5e'
 
 /**
- * 들여다보는 방의 내부. 지금은 방 데이터가 없어서 기본 원룸 가구만 있음.
- * 방 원점 = 창 중심, 로컬 -z 방향이 방 안쪽
+ * 들여다보는 방의 내부. 지금은 모든 방이 같은 기본 원룸 가구 (방마다 꾸미기는 다음 단계).
+ * 방 원점 = 방 가운데 창 중심, 로컬 -z 방향이 방 안쪽.
+ * 자거나 외출 중이면 천장 불이 꺼지고 창밖 빛만 살짝 들어옴
  */
 export function RoomInterior() {
   const focused = useFocused()
-  const slot = focused ? SLOT_BY_ID.get(focused) : undefined
+  const room = focused ? ROOM_BY_ID.get(focused) : undefined
+  const ceilingLight = useRef<PointLight>(null)
+  const ceilingDisc = useRef<MeshBasicMaterial>(null)
+
+  useFrame(() => {
+    if (!room) return
+    const on = isLightOn(currentActivity(room, environment.hour))
+    if (ceilingLight.current) ceilingLight.current.intensity = on ? 4 : 0
+    ceilingDisc.current?.color.setScalar(on ? 1 : 0.35)
+  })
 
   const floorTexture = useMemo(
     () =>
@@ -33,9 +47,10 @@ export function RoomInterior() {
     [],
   )
 
-  if (!slot) return null
+  if (!room) return null
 
-  const w = slot.size[0] + 0.1 // 방 폭 = 칸 폭
+  const { interiorCenter, rotationY, interiorWidth } = roomGeometry(room)
+  const w = interiorWidth // 방 폭 = 칸 폭 x 칸 수 (건물 몸통 밖으로 나가는 부분은 잘림)
   const h = BUILDING.floorHeight - 0.22 // 위아래 슬래브 두께만큼 뺌
   const d = ROOM_DEPTH
   // 바닥·천장을 슬래브 면에서 살짝 띄움. 딱 붙이면 면이 겹쳐 지글거림(z-fighting)
@@ -43,7 +58,7 @@ export function RoomInterior() {
   const ceilingY = h / 2 - 0.012
 
   return (
-    <group position={slot.position} rotation-y={slot.rotationY}>
+    <group position={interiorCenter} rotation-y={rotationY}>
       <group position-z={-d / 2 - 0.02}>
         {/* 바닥 */}
         <mesh rotation-x={-Math.PI / 2} position-y={floorY}>
@@ -71,9 +86,9 @@ export function RoomInterior() {
         {/* 천장 조명 */}
         <mesh position-y={ceilingY - 0.01} rotation-x={Math.PI / 2}>
           <circleGeometry args={[0.22, 24]} />
-          <meshBasicMaterial color="#fff6e0" toneMapped={false} />
+          <meshBasicMaterial ref={ceilingDisc} color="#fff6e0" toneMapped={false} />
         </mesh>
-        <pointLight position={[0, h / 2 - 0.3, 0]} intensity={4} distance={6} decay={1.5} color="#ffe2b8" />
+        <pointLight ref={ceilingLight} position={[0, h / 2 - 0.3, 0]} intensity={4} distance={6} decay={1.5} color="#ffe2b8" />
         {/* 창 쪽에서 은은하게 채우는 빛. 가구 앞면이 시커멓게 안 보이게 */}
         <pointLight position={[0, h / 2 - 0.4, d / 2 - 0.4]} intensity={0.7} distance={4} decay={1.5} color="#f3ecff" />
 
