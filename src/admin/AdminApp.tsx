@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ActivityKind, ROOMS } from '../data/rooms'
 import { defaultLayout, fetchLayout, roomSize } from '../scene/rooms/layoutData'
-import type { LayoutData, PlacedItem } from '../scene/rooms/types'
+import { DEFAULT_CHARACTER, type LayoutData, type PlacedItem } from '../scene/rooms/types'
 import { Dropdown } from './Dropdown'
 import { EditorScene } from './EditorScene'
 import { type Entry, ENTRIES, type Tab, TABS } from './entries'
@@ -18,7 +18,8 @@ function serialize(layout: LayoutData) {
   const items = layout.items.map((it) =>
     JSON.stringify({ ...it, x: round(it.x), y: round(it.y), z: round(it.z), rot: round(it.rot) }),
   )
-  return `{\n  "version": 1,\n  "wall": ${JSON.stringify(layout.wall)},\n  "floor": ${JSON.stringify(layout.floor)},\n  "items": [\n    ${items.join(',\n    ')}\n  ]\n}\n`
+  const character = layout.character ? `\n  "character": ${JSON.stringify(layout.character)},` : ''
+  return `{\n  "version": 1,\n  "wall": ${JSON.stringify(layout.wall)},\n  "floor": ${JSON.stringify(layout.floor)},${character}\n  "items": [\n    ${items.join(',\n    ')}\n  ]\n}\n`
 }
 
 /**
@@ -143,7 +144,9 @@ export function AdminApp() {
   /** 상자 칸 누르기: 물건은 놓기 모드, 벽지·바닥은 바로 바뀜 */
   const pick = (entry: Entry) => {
     setSelectedId(null)
-    if (entry.kind === 'wall') update((l) => ({ ...l, wall: entry.color }))
+    if (entry.kind === 'character')
+      update((l) => ({ ...l, character: { ...DEFAULT_CHARACTER, ...l.character, ...entry.patch } }))
+    else if (entry.kind === 'wall') update((l) => ({ ...l, wall: entry.color }))
     else if (entry.kind === 'floor') update((l) => ({ ...l, floor: entry.floor }))
     else {
       const same = placing?.item === entry.item && placing.variant === entry.variant
@@ -153,6 +156,10 @@ export function AdminApp() {
 
   const inUse = (entry: Entry) => {
     if (!layout) return false
+    if (entry.kind === 'character') {
+      const current = { ...DEFAULT_CHARACTER, ...layout.character }
+      return Object.entries(entry.patch).every(([k, v]) => current[k as keyof typeof current] === v)
+    }
     if (entry.kind === 'wall') return layout.wall === entry.color
     if (entry.kind === 'floor') return layout.floor === entry.floor
     return layout.items.some((it) => it.item === entry.item && (it.variant ?? '') === entry.variant)

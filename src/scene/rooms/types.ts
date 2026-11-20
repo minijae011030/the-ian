@@ -28,8 +28,24 @@ export type Spot = {
  * 방 배치 데이터 = public/data/layouts/<방id>.json
  * 에디터가 이 파일을 GitHub에 커밋하고, 뷰어는 fetch해서 그림
  */
+export type HumanLook = {
+  outfit?: string
+  hairColor?: string
+  accessory?: 'none' | 'glasses' | 'headset' | 'apron'
+}
+
+/** 방에 사는 캐릭터. 방마다 따로 */
+export type CharacterConfig = HumanLook & {
+  kind: 'human' | 'rabbit' | 'snail'
+  fur?: 'white' | 'brown'
+}
+
+export const DEFAULT_CHARACTER: CharacterConfig = { kind: 'human', outfit: 'hoodie', hairColor: 'black', accessory: 'none' }
+
 export type LayoutData = {
   version: 1
+  /** 없으면 DEFAULT_CHARACTER */
+  character?: CharacterConfig
   /** 벽 색 */
   wall: string
   /** 바닥 종류 (items/surfaces.ts) */

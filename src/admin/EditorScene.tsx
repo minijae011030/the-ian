@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BoxHelper, type Group, Plane, Raycaster, Vector2, Vector3 } from 'three'
 import type { ActivityKind } from '../data/rooms'
 import { CATALOG } from '../items/catalog'
-import { Character } from '../scene/character/Character'
+import { RoomCharacter } from '../scene/character/RoomCharacter'
 import { findSpot } from '../scene/rooms/layoutData'
 import { PlacedItemMesh } from '../scene/rooms/PlacedItems'
 import { RoomShell } from '../scene/rooms/RoomShell'
@@ -282,22 +282,21 @@ function Scene({
         ) : null
       })()}
 
-      {spot && (
-        <group
-          position={spot.position}
-          rotation-y={spot.rotationY}
-          onPointerDown={(e) => {
-            // 캐릭터를 잡으면 캐릭터가 쓰는 가구(의자·침대…)를 잡은 걸로
-            const source = layout.items.find((it) => it.id === spot.source)
-            if (e.button !== 0 || placing || !source) return
-            e.stopPropagation()
-            onSelect(source.id)
-            startDrag(source)
-          }}
-        >
-          <Character pose={spot.pose} hands={spot.hands} prop={spot.prop} seat={spot.seat} />
-        </group>
-      )}
+      <RoomCharacter
+        config={layout.character}
+        kind={previewKind}
+        size={size}
+        spot={spot}
+        items={layout.items}
+        onHumanPointerDown={(e) => {
+          // 캐릭터를 잡으면 캐릭터가 쓰는 가구(의자·침대…)를 잡은 걸로
+          const source = layout.items.find((it) => it.id === spot?.source)
+          if (e.button !== 0 || placing || !source) return
+          e.stopPropagation()
+          onSelect(source.id)
+          startDrag(source)
+        }}
+      />
       </group>
     </>
   )

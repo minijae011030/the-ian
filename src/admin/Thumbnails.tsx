@@ -2,8 +2,14 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef, useState } from 'react'
 import { Box3, type Group, type OrthographicCamera, Vector3 } from 'three'
 import { FLOORS } from '../items/floors'
+import { Rabbit } from '../items/kits/rooms'
+import { Character } from '../scene/character/Character'
+import { SnailCharacter } from '../scene/character/Pets'
 import { PlacedItemMesh } from '../scene/rooms/PlacedItems'
-import { ENTRIES, type ObjectEntry } from './entries'
+import { DEFAULT_CHARACTER } from '../scene/rooms/types'
+import { type CharacterEntry, ENTRIES, type ObjectEntry } from './entries'
+
+type Shootable = ObjectEntry | CharacterEntry
 
 const SIZE = 112
 
@@ -16,7 +22,7 @@ export function useThumbnails() {
     // 배경(벽·바닥)은 3D 없이 바로 그림
     const out: Record<string, string> = {}
     for (const e of ENTRIES) {
-      if (e.kind === 'object') continue
+      if (e.kind === 'object' || e.kind === 'character') continue
       const c = document.createElement('canvas')
       c.width = c.height = 128
       const ctx = c.getContext('2d')!
@@ -32,14 +38,14 @@ export function useThumbnails() {
     }
     return out
   })
-  const pending = ENTRIES.filter((e): e is ObjectEntry => e.kind === 'object' && !thumbs[e.key])
+  const pending = ENTRIES.filter((e): e is Shootable => (e.kind === 'object' || e.kind === 'character') && !thumbs[e.key])
   const baker = pending.length ? (
     <ThumbnailBaker entry={pending[0]} onShot={(key, url) => setThumbs((t) => ({ ...t, [key]: url }))} />
   ) : null
   return { thumbs, baker }
 }
 
-function ThumbnailBaker({ entry, onShot }: { entry: ObjectEntry; onShot: (key: string, url: string) => void }) {
+function ThumbnailBaker({ entry, onShot }: { entry: Shootable; onShot: (key: string, url: string) => void }) {
   return (
     <div className="fixed top-0 -left-[9999px]" style={{ width: SIZE, height: SIZE }}>
       <Canvas orthographic gl={{ preserveDrawingBuffer: true, alpha: true }} dpr={1} camera={{ near: -50, far: 50 }}>
@@ -51,7 +57,7 @@ function ThumbnailBaker({ entry, onShot }: { entry: ObjectEntry; onShot: (key: s
   )
 }
 
-function Shot({ entry, onShot }: { entry: ObjectEntry; onShot: (key: string, url: string) => void }) {
+function Shot({ entry, onShot }: { entry: Shootable; onShot: (key: string, url: string) => void }) {
   const group = useRef<Group>(null)
   const camera = useThree((s) => s.camera) as OrthographicCamera
   const gl = useThree((s) => s.gl)
@@ -84,7 +90,19 @@ function Shot({ entry, onShot }: { entry: ObjectEntry; onShot: (key: string, url
 
   return (
     <group ref={group}>
-      <PlacedItemMesh placed={{ id: 'thumb', item: entry.item, variant: entry.variant, x: 0, y: 0, z: 0, rot: 0 }} lit />
+      {entry.kind === 'object' ? (
+        <PlacedItemMesh placed={{ id: 'thumb', item: entry.item, variant: entry.variant, x: 0, y: 0, z: 0, rot: 0 }} lit />
+      ) : (
+        <CharacterThumb entry={entry} />
+      )}
     </group>
   )
 }
+
+function CharacterThumb({ entry }: { entry: CharacterEntry }) {
+  const config = { ...DEFAULT_CHARACTER, ...entry.patch }
+  if (config.kind === 'rabbit') return <Rabbit color={config.fur === 'brown' ? '#9a7458' : '#f2efe9'} />
+  if (config.kind === 'snail') return <SnailCharacter kind="rest" size={{ w: 0.4, d: 0.4, h: 1 }} onCeiling={false} />
+  return <Character pose="stand" hands="down" look={config} />
+}
+
