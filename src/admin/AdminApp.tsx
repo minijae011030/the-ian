@@ -6,18 +6,10 @@ import { defaultLayout, fetchLayout, roomSize } from '../scene/rooms/layoutData'
 import type { LayoutData, PlacedItem } from '../scene/rooms/types'
 import { EditorScene } from './EditorScene'
 import type { Placement } from './placement'
+import { ItemInspector } from './ItemInspector'
+import { KINDS } from './kinds'
 import { commitFiles, type GithubSettings, loadSettings, readFile, saveSettings } from './github'
 
-const KINDS: { kind: ActivityKind; label: string }[] = [
-  { kind: 'work', label: '작업' },
-  { kind: 'study', label: '공부' },
-  { kind: 'eat', label: '식사' },
-  { kind: 'rest', label: '휴식' },
-  { kind: 'skincare', label: '스킨케어' },
-  { kind: 'sleep', label: '잠' },
-  { kind: 'exercise', label: '운동' },
-  { kind: 'away', label: '외출' },
-]
 
 const CATEGORY_LABEL: Record<ItemDef['category'], string> = {
   furniture: '가구',
@@ -131,6 +123,13 @@ export function AdminApp() {
     [layout, update],
   )
 
+  const duplicateSelected = () => {
+    if (!selected) return
+    const copy = { ...selected, id: uniqueId(selected.item), x: round(Math.min(size.w / 2, selected.x + 0.3)) }
+    update((l) => ({ ...l, items: [...l.items, copy] }))
+    setSelectedId(copy.id)
+  }
+
   const removeSelected = useCallback(() => {
     if (!selectedId) return
     update((l) => ({ ...l, items: l.items.filter((it) => it.id !== selectedId) }))
@@ -170,9 +169,7 @@ export function AdminApp() {
         removeSelected()
       } else if (mod && e.key.toLowerCase() === 'd') {
         e.preventDefault()
-        const copy = { ...selected, id: uniqueId(selected.item), x: round(selected.x + 0.2) }
-        update((l) => ({ ...l, items: [...l.items, copy] }))
-        setSelectedId(copy.id)
+        duplicateSelected()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -286,11 +283,22 @@ export function AdminApp() {
         {selected ? (
           <ItemInspector
             item={selected}
-            onChange={(patch) => patchItem(selected.id, patch)}
+            size={size}
+            onChange={(patch, record = true) => patchItem(selected.id, patch, record)}
+            onScrubStart={remember}
+            onDuplicate={duplicateSelected}
             onRemove={removeSelected}
           />
         ) : (
-          <p className="hint">아이템을 클릭하면 여기서 고칠 수 있어.</p>
+          <div className="howto">
+            <p className="q">이렇게 꾸며</p>
+            <ol>
+              <li>왼쪽에서 방을 골라</li>
+              <li>물건을 누르고, 방에서 놓을 곳을 클릭</li>
+              <li>놓은 물건은 끌어서 옮기거나 클릭해서 여기서 고쳐</li>
+              <li>다 됐으면 맨 아래 저장</li>
+            </ol>
+          </div>
         )}
 
         <h2>방 설정</h2>
@@ -365,80 +373,5 @@ export function AdminApp() {
         <p className="hint">토큰은 이 브라우저에만 저장돼. 이 레포 Contents 쓰기 권한만 준 fine-grained 토큰을 써.</p>
       </aside>
     </div>
-  )
-}
-
-function ItemInspector({
-  item,
-  onChange,
-  onRemove,
-}: {
-  item: PlacedItem
-  onChange: (patch: Partial<PlacedItem>) => void
-  onRemove: () => void
-}) {
-  const def = CATALOG[item.item]
-  const num = (key: 'x' | 'y' | 'z' | 'rot') => (
-    <input
-      type="number"
-      step={key === 'rot' ? 90 : 0.05}
-      value={item[key]}
-      title={key}
-      onChange={(e) => onChange({ [key]: Number(e.target.value) })}
-    />
-  )
-  return (
-    <>
-      <h2>{def?.name ?? item.item}</h2>
-      <div className="field">
-        <label>이름</label>
-        <input value={item.id} readOnly />
-      </div>
-      {def && def.variants.length > 1 && (
-        <div className="field">
-          <label>종류</label>
-          <select value={item.variant ?? def.variants[0]} onChange={(e) => onChange({ variant: e.target.value })}>
-            {def.variants.map((v) => (
-              <option key={v}>{v}</option>
-            ))}
-          </select>
-        </div>
-      )}
-      <div className="field">
-        <label>
-          x · y
-          <br />z · 회전
-        </label>
-        <div className="xyz">
-          {num('x')}
-          {num('y')}
-          {num('z')}
-          {num('rot')}
-        </div>
-      </div>
-      <div className="field">
-        <label>보일 때</label>
-        <div className="checks">
-          {KINDS.map(({ kind, label }) => (
-            <label key={kind}>
-              <input
-                type="checkbox"
-                checked={!item.when || item.when.includes(kind)}
-                onChange={(e) => {
-                  const all = KINDS.map((k) => k.kind)
-                  const current = item.when ?? all
-                  const next = e.target.checked ? [...current, kind] : current.filter((k) => k !== kind)
-                  onChange({ when: next.length === all.length ? undefined : next })
-                }}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-      </div>
-      <button className="btn ghost" onClick={onRemove}>
-        삭제
-      </button>
-    </>
   )
 }

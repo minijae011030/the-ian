@@ -57,6 +57,26 @@ const SCREENS: Record<string, ((ctx: CanvasRenderingContext2D) => void) | undefi
   'cover-letter': drawCoverLetter,
 }
 
+/** 에디터에 보여줄 종류 이름과 색 견본 */
+export const VARIANT_INFO: Record<string, { name: string; color?: string }> = {
+  blue: { name: '파랑', color: BLANKETS.blue },
+  lilac: { name: '연보라', color: BLANKETS.lilac },
+  gray: { name: '회색', color: '#8c93a1' },
+  red: { name: '빨강', color: BLANKETS.red },
+  charcoal: { name: '진회색', color: CHAIRS.charcoal },
+  beige: { name: '베이지', color: RUGS.beige },
+  sand: { name: '모래색', color: RUGS.sand },
+  wine: { name: '와인', color: RUGS.wine },
+  short: { name: '짧은 거' },
+  long: { name: '긴 거' },
+  suits: { name: '정장' },
+  casual: { name: '평상복' },
+  job: { name: '취준 책' },
+  plain: { name: '그냥 책' },
+  blank: { name: '빈 화면' },
+  'cover-letter': { name: '자소서' },
+}
+
 export const CATALOG: Record<string, ItemDef> = {
   bed: {
     name: '싱글 침대',

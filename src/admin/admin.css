@@ -17,7 +17,7 @@ body,
 
 .admin {
   display: grid;
-  grid-template-columns: 240px 1fr 280px;
+  grid-template-columns: 240px 1fr 300px;
   height: 100%;
 }
 
@@ -108,10 +108,77 @@ body,
   color: #8a91a2;
 }
 
+/* 칸이 좁은 항목은 이름을 위에, 입력은 한 줄 전체로 */
+.field.stacked {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
 .xyz {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
+}
+
+/* 왼쪽 글자를 끌어서 값 바꾸는 숫자 칸 */
+.scrub {
+  display: flex;
+  align-items: center;
+  border: 1px solid #262d3c;
+  border-radius: 6px;
+  background: #0d1017;
+}
+
+.scrub:focus-within {
+  border-color: #4a5a80;
+}
+
+.scrub-label {
+  padding: 0 3px 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.scrub input {
+  min-width: 0;
+  border: 0;
+  padding: 6px 6px 6px 2px;
+  background: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+.scrub input:focus {
+  outline: none;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  overflow: hidden;
+  border: 1px solid #262d3c;
+  border-radius: 6px;
+}
+
+.segmented button {
+  border: 0;
+  padding: 6px 0;
+  background: transparent;
+  color: #8a91a2;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.segmented button + button {
+  border-left: 1px solid #262d3c;
+}
+
+.segmented button.active {
+  background: #26304a;
+  color: #fff;
 }
 
 input,
@@ -227,4 +294,153 @@ input[type='checkbox'] {
   left: 12px;
   color: #6f7788;
   font-size: 12px;
+}
+
+/* 패널 가로로 넘치지 않게 (그리드 칸이 내용 때문에 늘어나는 것 방지) */
+.panel {
+  overflow-x: hidden;
+}
+
+.field > *,
+.xyz > *,
+.row2 > * {
+  min-width: 0;
+}
+
+/* ── 아이템 패널: 버튼 위주 ── */
+.inspector section {
+  margin-bottom: 18px;
+}
+
+.inspector .q,
+.howto .q {
+  margin-bottom: 8px;
+  color: #e6e8ee;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tip {
+  margin-top: 6px;
+  color: #6f7788;
+  font-size: 12px;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choices button,
+.row2 button,
+.pad button {
+  border: 1px solid #262d3c;
+  border-radius: 10px;
+  background: #171c27;
+  color: #d8dbe2;
+  font: inherit;
+  cursor: pointer;
+}
+
+.choices button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+.choices button:hover,
+.row2 button:hover,
+.pad button:hover {
+  background: #1e2533;
+}
+
+.choices button.active {
+  border-color: #8ab4ff;
+  background: #22304d;
+  color: #fff;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+/* 방향 패드: 십자 모양 */
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 44px);
+  gap: 4px;
+  max-width: 220px;
+  margin: 0 auto;
+}
+
+.pad button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.pad button small {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #8a91a2;
+}
+
+.pad-up {
+  grid-area: 1 / 2;
+}
+
+.pad-left {
+  grid-area: 2 / 1;
+}
+
+.pad-right {
+  grid-area: 2 / 3;
+}
+
+.pad-down {
+  grid-area: 3 / 2;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.row2 button {
+  padding: 10px 8px;
+  font-weight: 600;
+}
+
+.row2 button.danger {
+  border-color: #5a2a2e;
+  color: #ff8a80;
+}
+
+.advanced {
+  margin-top: 18px;
+  border-top: 1px solid #1f2532;
+  padding-top: 12px;
+}
+
+.advanced summary {
+  color: #8a91a2;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.howto ol {
+  padding-left: 18px;
+  color: #b9bfcc;
+  line-height: 1.9;
 }
