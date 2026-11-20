@@ -11,18 +11,7 @@ export function Clock() {
   }, [])
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 20,
-        left: 24,
-        color: 'rgba(255, 255, 255, 0.85)',
-        font: '500 13px/1.4 "Helvetica Neue", Arial, sans-serif',
-        letterSpacing: '0.12em',
-        pointerEvents: 'none',
-        textShadow: '0 1px 6px rgba(0, 0, 0, 0.35)',
-      }}
-    >
+    <div className="pointer-events-none fixed top-5 left-6 text-[13px]/[1.4] font-medium tracking-[0.12em] text-white/85 [text-shadow:0_1px_6px_rgba(0,0,0,0.35)]">
       SEOUL {formatHour(hour)}
     </div>
   )

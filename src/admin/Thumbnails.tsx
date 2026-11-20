@@ -41,7 +41,7 @@ export function useThumbnails() {
 
 function ThumbnailBaker({ entry, onShot }: { entry: ObjectEntry; onShot: (key: string, url: string) => void }) {
   return (
-    <div style={{ position: 'fixed', left: -9999, top: 0, width: SIZE, height: SIZE }}>
+    <div className="fixed top-0 -left-[9999px]" style={{ width: SIZE, height: SIZE }}>
       <Canvas orthographic gl={{ preserveDrawingBuffer: true, alpha: true }} dpr={1} camera={{ near: -50, far: 50 }}>
         <ambientLight intensity={1} />
         <directionalLight position={[3, 6, 4]} intensity={1.3} />

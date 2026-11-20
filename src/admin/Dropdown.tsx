@@ -26,19 +26,24 @@ export function Dropdown<T extends string>({
   }, [open])
 
   return (
-    <div className="dropdown" ref={ref} style={{ width }}>
-      <button className={`dd-button ${bold ? 'bold' : ''}`} onClick={() => setOpen((v) => !v)}>
+    <div className="relative" ref={ref} style={{ width }}>
+      <button
+        className={`flex h-[30px] w-full cursor-pointer items-center justify-between gap-2 rounded-[3px] border border-line bg-ink px-2.5 leading-none ${bold ? 'font-bold' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+      >
         <span>{current?.label}</span>
-        <svg width="10" height="6" viewBox="0 0 10 6" aria-hidden>
+        <svg className="flex-none text-mute" width="10" height="6" viewBox="0 0 10 6" aria-hidden>
           <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       {open && (
-        <ul className="dd-list">
+        <ul className="absolute top-[34px] left-0 z-40 min-w-full rounded-[3px] border border-line bg-panel p-1 shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
           {options.map((o) => (
             <li key={o.value}>
               <button
-                className={o.value === value ? 'active' : ''}
+                className={`w-full cursor-pointer rounded-[2px] px-2.5 py-[7px] text-left whitespace-nowrap hover:bg-hover ${
+                  o.value === value ? 'font-bold text-accent' : ''
+                }`}
                 onClick={() => {
                   onChange(o.value)
                   setOpen(false)

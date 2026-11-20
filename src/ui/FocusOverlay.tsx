@@ -23,42 +23,17 @@ export function FocusOverlay() {
   const activity = currentActivity(room, hour)
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        left: '50%',
-        bottom: 32,
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 16,
-        padding: '10px 12px 10px 20px',
-        borderRadius: 999,
-        background: 'rgba(12, 18, 34, 0.72)',
-        backdropFilter: 'blur(8px)',
-        color: '#fff',
-        font: '500 14px/1 "Helvetica Neue", "Apple SD Gothic Neo", sans-serif',
-        whiteSpace: 'nowrap',
-      }}
-    >
+    <div className="fixed bottom-8 left-1/2 flex -translate-x-1/2 items-center gap-4 rounded-full bg-[rgba(12,18,34,0.72)] py-2.5 pr-3 pl-5 text-sm/none font-medium whitespace-nowrap text-white backdrop-blur-md">
       <span>
-        <b style={{ fontWeight: 700 }}>{room.name}</b>
-        <span style={{ opacity: 0.55, margin: '0 8px' }}>·</span>
+        <b className="font-bold">{room.name}</b>
+        <span className="mx-2 opacity-55">·</span>
         {room.floor}층
-        <span style={{ opacity: 0.55, margin: '0 8px' }}>·</span>
-        <span style={{ opacity: 0.85 }}>{activity.label}</span>
+        <span className="mx-2 opacity-55">·</span>
+        <span className="opacity-85">{activity.label}</span>
       </span>
       <button
+        className="cursor-pointer rounded-full bg-white/15 px-3.5 py-2 hover:bg-white/25"
         onClick={() => setFocused(null)}
-        style={{
-          border: 0,
-          borderRadius: 999,
-          padding: '8px 14px',
-          background: 'rgba(255, 255, 255, 0.16)',
-          color: '#fff',
-          font: 'inherit',
-          cursor: 'pointer',
-        }}
       >
         나가기 (Esc)
       </button>

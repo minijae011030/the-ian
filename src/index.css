@@ -1,14 +1,13 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Helvetica Neue', 'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif;
 }
 
-html,
-body,
-#root {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #0b1a3a;
+@layer base {
+  html,
+  body,
+  #root {
+    @apply size-full overflow-hidden bg-[#0b1a3a];
+  }
 }

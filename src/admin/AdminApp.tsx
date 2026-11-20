@@ -204,8 +204,8 @@ export function AdminApp() {
   const shown = ENTRIES.filter((e) => (tab === 'all' ? e.kind === 'object' : e.tab === tab))
 
   return (
-    <div className="admin">
-      <header className="topbar">
+    <div className="grid h-full grid-rows-[48px_minmax(0,1fr)_236px]">
+      <header className="flex items-center gap-3 border-b border-line-soft bg-panel px-3">
         <Dropdown
           bold
           width={150}
@@ -218,14 +218,16 @@ export function AdminApp() {
           }}
         />
 
-        <div className="tools">
-          <button className="icon" title="시점 왼쪽으로" onClick={() => setView((v) => (v + 3) % 4)}>
+        <div className="mx-auto flex items-center gap-1.5">
+          <button className="tool-btn px-0" title="시점 왼쪽으로" onClick={() => setView((v) => (v + 3) % 4)}>
             <RotateIcon flip />
           </button>
-          <button className="icon" title="시점 오른쪽으로" onClick={() => setView((v) => (v + 1) % 4)}>
+          <button className="tool-btn px-0" title="시점 오른쪽으로" onClick={() => setView((v) => (v + 1) % 4)}>
             <RotateIcon />
           </button>
-          <button onClick={undo}>되돌리기</button>
+          <button className="tool-btn" onClick={undo}>
+            되돌리기
+          </button>
           <Dropdown
             width={110}
             value={previewKind}
@@ -234,11 +236,11 @@ export function AdminApp() {
           />
         </div>
 
-        <div className="save-area">
+        <div className="relative flex items-center gap-1.5">
           {status && (
-            <span className={`status ${status.error ? 'error' : ''}`}>
+            <span className={`text-xs ${status.error ? 'text-danger' : 'text-mute'}`}>
               {status.url ? (
-                <a href={status.url} target="_blank" rel="noreferrer">
+                <a className="text-accent" href={status.url} target="_blank" rel="noreferrer">
                   {status.text}
                 </a>
               ) : (
@@ -246,36 +248,41 @@ export function AdminApp() {
               )}
             </span>
           )}
-          <button className="save" disabled={saving || dirtyIds.length === 0} onClick={save}>
+          <button
+            className="h-[30px] cursor-pointer rounded-[3px] border border-[#7a2a2a] bg-[#5e1f22] px-3.5 font-bold text-white disabled:cursor-default disabled:border-line disabled:bg-raised disabled:text-[#6b707c]"
+            disabled={saving || dirtyIds.length === 0}
+            onClick={save}
+          >
             미니룸 저장하기
           </button>
-          <button className="gear" onClick={() => setShowSettings((v) => !v)}>
+          <button className="tool-btn" onClick={() => setShowSettings((v) => !v)}>
             ⚙
           </button>
           {showSettings && (
-            <div className="settings">
-              <label>
-                레포
-                <input value={settings.repo} onChange={(e) => updateSettings({ repo: e.target.value.trim() })} />
-              </label>
-              <label>
-                브랜치
-                <input value={settings.branch} onChange={(e) => updateSettings({ branch: e.target.value.trim() })} />
-              </label>
-              <label>
-                토큰
-                <input
-                  type="password"
-                  value={settings.token}
-                  onChange={(e) => updateSettings({ token: e.target.value.trim() })}
-                />
-              </label>
+            <div className="absolute top-[38px] right-0 z-30 flex w-[260px] flex-col gap-2 rounded border border-line bg-panel p-3 shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
+              {(
+                [
+                  ['레포', 'repo', 'text'],
+                  ['브랜치', 'branch', 'text'],
+                  ['토큰', 'token', 'password'],
+                ] as const
+              ).map(([label, key, type]) => (
+                <label key={key} className="grid grid-cols-[48px_1fr] items-center text-mute">
+                  {label}
+                  <input
+                    className="field-input min-w-0 text-text"
+                    type={type}
+                    value={settings[key]}
+                    onChange={(e) => updateSettings({ [key]: e.target.value.trim() })}
+                  />
+                </label>
+              ))}
             </div>
           )}
         </div>
       </header>
 
-      <main className="stage">
+      <main className="relative min-h-0 min-w-0 overflow-hidden">
         {layout && (
           <EditorScene
             size={size}
@@ -297,24 +304,38 @@ export function AdminApp() {
         )}
       </main>
 
-      <section className="itembox">
-        <nav className="tabs">
+      <section className="flex min-h-0 flex-col border-t border-line-soft bg-panel">
+        <nav className="flex gap-0.5 border-b border-line px-3 pt-2">
           {TABS.map((t) => (
-            <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>
+            <button
+              key={t.id}
+              className={`-mb-px cursor-pointer rounded-t border border-b-0 px-4 py-1.5 font-bold ${
+                tab === t.id ? 'border-line bg-raised text-white' : 'border-transparent text-mute'
+              }`}
+              onClick={() => setTab(t.id)}
+            >
               {t.label}
             </button>
           ))}
         </nav>
-        <div className="grid">
+        <div className="grid grid-cols-[repeat(auto-fill,96px)] gap-2.5 overflow-y-auto p-3">
           {shown.map((entry) => {
             const active = placing && entry.kind === 'object' && placing.item === entry.item && placing.variant === entry.variant
             return (
-              <button key={entry.key} className={`cell ${active ? 'active' : ''}`} onClick={() => pick(entry)}>
-                <span className="thumb">
-                  {thumbs[entry.key] ? <img src={thumbs[entry.key]} alt="" /> : null}
-                  {inUse(entry) && <em>사용중</em>}
+              <button key={entry.key} className="group flex cursor-pointer flex-col items-center gap-1" onClick={() => pick(entry)}>
+                <span
+                  className={`relative block size-24 overflow-hidden rounded bg-[#e9e7e2] ${
+                    active ? 'border-2 border-accent' : 'border border-line group-hover:border-[#6b7180]'
+                  }`}
+                >
+                  {thumbs[entry.key] && <img className="size-full object-cover" src={thumbs[entry.key]} alt="" />}
+                  {inUse(entry) && (
+                    <em className="absolute inset-x-0 bottom-1.5 text-center text-xs font-extrabold text-[#c0392b] not-italic [text-shadow:0_0_3px_#fff,0_0_3px_#fff]">
+                      사용중
+                    </em>
+                  )}
                 </span>
-                <span className="name">{entry.name}</span>
+                <span className="w-24 truncate text-center text-xs">{entry.name}</span>
               </button>
             )
           })}
