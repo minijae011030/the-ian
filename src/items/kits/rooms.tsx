@@ -1,6 +1,8 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import type { Group } from 'three'
+import { type CanvasTexture, DoubleSide, type Group, RepeatWrapping } from 'three'
+import { PAN_SCALE } from '../../scene/character/Pets'
+import { RabbitBody, type RabbitFur } from '../../scene/character/RabbitBody'
 import { canvasTexture } from '../../lib/canvasTexture'
 import { Box, Chair, Desk, METAL, WOOD } from '../parts'
 
@@ -53,49 +55,8 @@ export function YogaMat({ color = '#6a5acd' }: { color?: string }) {
 
 /* ───── 토끼방 ───── */
 
-export function RabbitCage() {
-  const bars = useMemo(() => Array.from({ length: 11 }, (_, i) => -0.5 + i * 0.1), [])
-  return (
-    <group>
-      <Box size={[1.05, 0.1, 0.6]} position={[0, 0.05, 0]} color="#d8d4cc" />
-      <Box size={[1.0, 0.02, 0.55]} position={[0, 0.11, 0]} color="#d9c27a" />
-      {/* 철망: 앞뒤 세로살 + 옆면 + 지붕 */}
-      {bars.map((x) =>
-        [-0.29, 0.29].map((z) => <Box key={`${x}${z}`} size={[0.01, 0.5, 0.01]} position={[x, 0.35, z]} color="#c9ccd2" />),
-      )}
-      {[-0.52, 0.52].map((x) =>
-        [-0.2, -0.1, 0, 0.1, 0.2].map((z) => <Box key={`${x}${z}`} size={[0.01, 0.5, 0.01]} position={[x, 0.35, z]} color="#c9ccd2" />),
-      )}
-      {/* 위아래 테두리 + 지붕 철망 (판으로 막으면 안이 안 보임) */}
-      {[0.1, 0.6].map((y) =>
-        [-0.29, 0.29].map((z) => <Box key={`${y}${z}`} size={[1.05, 0.012, 0.012]} position={[0, y, z]} color="#c9ccd2" />),
-      )}
-      {bars.map((x) => (
-        <Box key={x} size={[0.01, 0.01, 0.58]} position={[x, 0.6, 0]} color="#c9ccd2" />
-      ))}
-      {/* 숨숨집 */}
-      <Box size={[0.3, 0.2, 0.3]} position={[0.3, 0.22, 0]} color={WOOD} />
-      <Box size={[0.12, 0.12, 0.01]} position={[0.3, 0.18, 0.15]} color="#3a2d22" />
-    </group>
-  )
-}
-
-export function HayBowl() {
-  return (
-    <group>
-      <mesh position-y={0.04}>
-        <cylinderGeometry args={[0.1, 0.08, 0.08, 14]} />
-        <meshStandardMaterial color="#d9cbb8" />
-      </mesh>
-      {Array.from({ length: 8 }, (_, i) => (
-        <Box key={i} size={[0.01, 0.01, 0.16]} position={[Math.sin(i) * 0.04, 0.09, Math.cos(i * 2) * 0.03]} color="#c9b25a" />
-      ))}
-    </group>
-  )
-}
-
 /** 토끼. 가끔 귀를 쫑긋하고 코를 씰룩거림 */
-export function Rabbit({ color = '#f2efe9' }: { color?: string }) {
+export function Rabbit({ fur = 'mine' }: { fur?: RabbitFur }) {
   const head = useRef<Group>(null)
   const ears = useRef<Group>(null)
   useFrame(({ clock }) => {
@@ -104,36 +65,252 @@ export function Rabbit({ color = '#f2efe9' }: { color?: string }) {
     if (ears.current) ears.current.rotation.x = Math.max(0, Math.sin(t * 0.7)) * 0.3
   })
   return (
-    <group scale={0.9}>
-      <mesh position={[0, 0.09, -0.02]} scale={[0.09, 0.08, 0.12]}>
-        <sphereGeometry args={[1, 16, 12]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-      <mesh position={[0, 0.07, -0.13]}>
-        <sphereGeometry args={[0.025, 8, 6]} />
-        <meshStandardMaterial color="#ffffff" />
-      </mesh>
-      <group ref={head} position={[0, 0.15, 0.08]}>
-        <mesh scale={[0.06, 0.055, 0.065]}>
-          <sphereGeometry args={[1, 14, 10]} />
-          <meshStandardMaterial color={color} />
-        </mesh>
-        {[-1, 1].map((s) => (
-          <mesh key={s} position={[s * 0.03, 0.01, 0.05]}>
-            <sphereGeometry args={[0.008, 6, 4]} />
-            <meshBasicMaterial color="#1a1a1a" />
-          </mesh>
-        ))}
-        <group ref={ears} position={[0, 0.04, -0.01]}>
-          {[-1, 1].map((s) => (
-            <mesh key={s} position={[s * 0.025, 0.06, 0]} rotation-z={s * -0.15} scale={[0.018, 0.07, 0.01]}>
-              <sphereGeometry args={[1, 8, 6]} />
-              <meshStandardMaterial color={color} />
-            </mesh>
-          ))}
-        </group>
-      </group>
+    <group scale={1.8}>
+      <RabbitBody fur={fur} headRef={head} earsRef={ears} />
     </group>
+  )
+}
+
+/** 건초 몇 가닥 (보기용, 위치는 고정) */
+function Hay({ count, spread, y = 0, seed = 1 }: { count: number; spread: [number, number]; y?: number; seed?: number }) {
+  const blades = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => {
+        const k = i * 1.37 + seed * 7.1
+        return {
+          x: Math.sin(k * 3.1) * spread[0],
+          z: Math.cos(k * 2.3) * spread[1],
+          y: y + (i % 4) * 0.004,
+          rot: k * 2.9,
+          len: 0.1 + (i % 5) * 0.03,
+          c: i % 3 === 0 ? '#a99f52' : i % 3 === 1 ? '#c2b56a' : '#8e9a5a',
+        }
+      }),
+    [count, spread, y, seed],
+  )
+  return (
+    <>
+      {blades.map((b, i) => (
+        <group key={i} position={[b.x, b.y, b.z]} rotation-y={b.rot}>
+          <Box size={[0.007, 0.005, b.len]} position={[0, 0, 0]} color={b.c} />
+        </group>
+      ))}
+    </>
+  )
+}
+
+/**
+ * 배변판. 하얀 격자판에 밥그릇·물그릇이 같이 있음 (여기서 먹고 마시고 쌈).
+ * 그릇은 뒤쪽(-z), 토끼는 앞(+z)에서 들어옴. 위치는 Pets의 PAN과 맞춤
+ */
+export function LitterPan() {
+  const grid = useMemo(() => {
+    const tex = canvasTexture(128, 128, (ctx) => {
+      ctx.fillStyle = '#f1efea'
+      ctx.fillRect(0, 0, 128, 128)
+      ctx.fillStyle = '#c9c4ba'
+      for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) ctx.fillRect(i * 16 + 4, j * 16 + 4, 9, 9)
+    })
+    tex.wrapS = tex.wrapT = RepeatWrapping
+    tex.repeat.set(7, 5)
+    return tex
+  }, [])
+  return (
+    <group scale={PAN_SCALE}>
+      {/* 판 */}
+      <Box size={[1.2, 0.02, 0.85]} position={[0, 0.01, 0]} color="#e9e6e0" />
+      <mesh position-y={0.032} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[1.16, 0.81]} />
+        <meshStandardMaterial map={grid} roughness={0.9} />
+      </mesh>
+      {[-0.595, 0.595].map((x) => (
+        <Box key={x} size={[0.012, 0.05, 0.85]} position={[x, 0.025, 0]} color="#e9e6e0" />
+      ))}
+      {[-0.42, 0.42].map((z) => (
+        <Box key={z} size={[1.2, 0.05, 0.012]} position={[0, 0.025, z]} color="#e9e6e0" />
+      ))}
+      {/* 구석에 깔아둔 분홍 패드 */}
+      <mesh position={[0.4, 0.034, 0.24]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[0.36, 0.32]} />
+        <meshStandardMaterial color="#e9b9a8" roughness={1} />
+      </mesh>
+      {/* 밥그릇: 갈색 토기 + 건초·사료 */}
+      <group position={[-0.28, 0.035, -0.16]}>
+        <mesh position-y={0.045}>
+          <cylinderGeometry args={[0.17, 0.15, 0.09, 20, 1, true]} />
+          <meshStandardMaterial color="#b9773f" roughness={0.95} side={DoubleSide} />
+        </mesh>
+        <mesh position-y={0.005}>
+          <cylinderGeometry args={[0.15, 0.15, 0.01, 20]} />
+          <meshStandardMaterial color="#b9773f" />
+        </mesh>
+        <mesh position-y={0.04} rotation-x={-Math.PI / 2}>
+          <circleGeometry args={[0.155, 20]} />
+          <meshStandardMaterial color="#7d6a3e" roughness={1} />
+        </mesh>
+        <Hay count={10} spread={[0.08, 0.08]} y={0.05} seed={3} />
+      </group>
+      {/* 물그릇: 하얀 도자기 */}
+      <group position={[0.3, 0.035, -0.18]}>
+        <mesh position-y={0.04}>
+          <cylinderGeometry args={[0.13, 0.11, 0.08, 20, 1, true]} />
+          <meshStandardMaterial color="#f4f2ee" roughness={0.3} side={DoubleSide} />
+        </mesh>
+        <mesh position-y={0.005}>
+          <cylinderGeometry args={[0.11, 0.11, 0.01, 20]} />
+          <meshStandardMaterial color="#f4f2ee" />
+        </mesh>
+        <mesh position-y={0.06} rotation-x={-Math.PI / 2}>
+          <circleGeometry args={[0.122, 20]} />
+          <meshStandardMaterial color="#a9c6d2" roughness={0.05} transparent opacity={0.75} />
+        </mesh>
+      </group>
+      {/* 여기저기 흩어진 건초 */}
+      <Hay count={26} spread={[0.52, 0.36]} y={0.036} />
+    </group>
+  )
+}
+
+/** 꽃무늬 천 (회청색 바탕에 빨강·분홍·보라 잔꽃) */
+function useFloral() {
+  return useMemo(() => {
+    const tex = canvasTexture(256, 256, (ctx) => {
+      ctx.fillStyle = '#6d7893'
+      ctx.fillRect(0, 0, 256, 256)
+      const colors = ['#c9425a', '#e88aa0', '#a982c9', '#d76b7d', '#7f9a78']
+      for (let i = 0; i < 90; i++) {
+        const x = (Math.sin(i * 12.9898) * 43758.5453) % 1
+        const y = (Math.sin(i * 78.233) * 12543.21) % 1
+        ctx.fillStyle = colors[i % colors.length]
+        ctx.beginPath()
+        const cx = Math.abs(x) * 256
+        const cy = Math.abs(y) * 256
+        // 꽃잎 다섯 장 + 노란 가운데
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * Math.PI * 2 + i
+          ctx.beginPath()
+          ctx.arc(cx + Math.cos(a) * 3, cy + Math.sin(a) * 3, 2.6, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.fillStyle = '#e9d27a'
+        ctx.fillRect(cx - 1, cy - 1, 2, 2)
+      }
+    })
+    tex.wrapS = tex.wrapT = RepeatWrapping
+    tex.repeat.set(2, 2)
+    return tex
+  }, [])
+}
+
+function Cloth({
+  size,
+  position,
+  rotation = [0, 0, 0],
+  map,
+}: {
+  size: [number, number, number]
+  position: [number, number, number]
+  rotation?: [number, number, number]
+  map: CanvasTexture
+}) {
+  return (
+    <mesh position={position} rotation={rotation}>
+      <boxGeometry args={size} />
+      <meshStandardMaterial map={map} roughness={1} />
+    </mesh>
+  )
+}
+
+/**
+ * 숨숨집. 상자에 꽃무늬 천을 덮어씌운 것. 앞(+z)이 뚫려 있고
+ * 바닥엔 줄무늬 수건이 깔려서 문 밖으로 살짝 나옴. 토끼가 안에 들어가서 숨음
+ */
+export function RabbitHouse() {
+  const floral = useFloral()
+  const towel = useMemo(
+    () =>
+      canvasTexture(128, 64, (ctx) => {
+        ctx.fillStyle = '#efe6d4'
+        ctx.fillRect(0, 0, 128, 64)
+        const stripes: [number, string][] = [
+          [14, '#a08a70'],
+          [30, '#8a7c6c'],
+          [46, '#c4a98a'],
+          [62, '#c4554a'],
+          [80, '#8a7c6c'],
+          [100, '#b59a7c'],
+        ]
+        for (const [x, c] of stripes) {
+          ctx.fillStyle = c
+          ctx.fillRect(x, 0, x === 46 ? 10 : 3, 64)
+        }
+      }),
+    [],
+  )
+  const W = 0.4
+  const H = 0.3
+  const D = 0.42
+  return (
+    <group>
+      {/* 안쪽 상자 */}
+      <Box size={[W, 0.02, D]} position={[0, 0.01, 0]} color="#d8cfbf" />
+      <Box size={[0.02, H, D]} position={[-W / 2, H / 2, 0]} color="#d8cfbf" />
+      <Box size={[0.02, H, D]} position={[W / 2, H / 2, 0]} color="#d8cfbf" />
+      <Box size={[W, H, 0.02]} position={[0, H / 2, -D / 2]} color="#cfc5b3" />
+      {/* 수건: 안에서 문 밖으로 살짝 */}
+      <mesh position={[0, 0.026, 0.08]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[W - 0.04, D + 0.06]} />
+        <meshStandardMaterial map={towel} roughness={1} />
+      </mesh>
+      {/* 꽃무늬 천: 지붕은 살짝 처지고, 옆·뒤는 바닥까지 늘어져서 끝이 퍼짐 */}
+      <Cloth map={floral} size={[W + 0.06, 0.02, D + 0.05]} position={[0, H + 0.02, 0]} />
+      <Cloth map={floral} size={[W + 0.04, 0.03, D * 0.6]} position={[0, H - 0.01, 0]} />
+      {[-1, 1].map((sx) => (
+        <group key={sx}>
+          <Cloth
+            map={floral}
+            size={[0.02, H + 0.02, D + 0.05]}
+            position={[sx * (W / 2 + 0.03), H / 2, 0]}
+            rotation={[0, 0, sx * 0.04]}
+          />
+          {/* 앞 모서리에서 바닥까지 흘러내린 자락 */}
+          <Cloth
+            map={floral}
+            size={[0.12, H, 0.015]}
+            position={[sx * (W / 2 + 0.02), H / 2 - 0.01, D / 2 + 0.04]}
+            rotation={[0.08, sx * -0.5, 0]}
+          />
+          <Cloth map={floral} size={[0.14, 0.012, 0.14]} position={[sx * (W / 2 + 0.06), 0.008, D / 2 + 0.04]} />
+        </group>
+      ))}
+      <Cloth map={floral} size={[W + 0.06, H + 0.02, 0.015]} position={[0, H / 2, -D / 2 - 0.03]} />
+      {/* 문 위로 접혀 내려온 천 */}
+      <Cloth map={floral} size={[W + 0.06, 0.09, 0.015]} position={[0, H - 0.035, D / 2 + 0.03]} rotation={[0.12, 0, 0]} />
+    </group>
+  )
+}
+
+/** 체크무늬 놀이 매트. 토끼 미끄러지지 말라고 까는 회색 깅엄 */
+export function CheckMat({ size = [1.6, 1.2] as [number, number] }: { size?: [number, number] }) {
+  const texture = useMemo(() => {
+    const tex = canvasTexture(128, 128, (ctx) => {
+      ctx.fillStyle = '#eceae6'
+      ctx.fillRect(0, 0, 128, 128)
+      ctx.fillStyle = 'rgba(120,124,130,0.45)'
+      for (let i = 0; i < 8; i += 2) {
+        ctx.fillRect(i * 16, 0, 16, 128)
+        ctx.fillRect(0, i * 16, 128, 16)
+      }
+    })
+    tex.wrapS = tex.wrapT = RepeatWrapping
+    tex.repeat.set(size[0] * 2.5, size[1] * 2.5)
+    return tex
+  }, [size])
+  return (
+    <mesh position-y={0.007} rotation-x={-Math.PI / 2}>
+      <planeGeometry args={size} />
+      <meshStandardMaterial map={texture} roughness={1} />
+    </mesh>
   )
 }
 

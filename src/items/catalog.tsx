@@ -341,31 +341,31 @@ export const CATALOG: Record<string, ItemDef> = {
   },
 
   /* ───── 토끼방 ───── */
-  'rabbit-cage': {
-    name: '토끼 케이지',
+  'rabbit-toilet': {
+    name: '배변판',
+    category: 'decor',
+    place: 'floor',
+    footprint: [0.58, 0.41],
+    flat: true, // 토끼가 올라가서 먹고 마시고 쌈
+    variants: ['default'],
+    render: () => <Kit.LitterPan />,
+  },
+  'rabbit-house': {
+    name: '숨숨집',
     category: 'furniture',
     place: 'floor',
-    footprint: [1.05, 0.6],
+    footprint: [0.5, 0.5],
     variants: ['default'],
-    render: () => <Kit.RabbitCage />,
+    render: () => <Kit.RabbitHouse />,
   },
-  rabbit: {
-    name: '토끼',
+  'check-mat': {
+    name: '체크 매트',
     category: 'decor',
     place: 'floor',
-    footprint: [0.2, 0.3],
-    flat: true, // 케이지 안에도 넣을 수 있게
-    variants: ['white', 'brown'],
-    render: ({ variant }) => <Kit.Rabbit color={variant === 'brown' ? '#9a7458' : '#f2efe9'} />,
-  },
-  'hay-bowl': {
-    name: '건초 그릇',
-    category: 'decor',
-    place: 'floor',
-    footprint: [0.2, 0.2],
+    footprint: [1.6, 1.2],
     flat: true,
     variants: ['default'],
-    render: () => <Kit.HayBowl />,
+    render: () => <Kit.CheckMat />,
   },
   'snail-cage': {
     name: '달팽이 사육통',

@@ -3,6 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { type Group, InstancedMesh, Object3D, type Points, Vector3 } from 'three'
 import type { ActivityKind } from '../../data/rooms'
 import type { RoomSize } from '../rooms/types'
+import { RabbitBody, type RabbitFur } from './RabbitBody'
 
 /**
  * 방에 사는 토끼·달팽이 캐릭터. 원점 = 방 바닥 한가운데 (RoomView와 같은 좌표).
@@ -12,17 +13,42 @@ import type { RoomSize } from '../rooms/types'
 const rand = (min: number, max: number) => min + Math.random() * (max - min)
 
 /** 바닥에서 막힌 사각형 (가구). 토끼가 가구 속으로 들어가지 않게 */
-export type Obstacle = { minX: number; maxX: number; minZ: number; maxZ: number }
-const inside = (obs: Obstacle[], x: number, z: number, pad = 0.08) =>
+export type Obstacle = {
+  minX: number
+  maxX: number
+  minZ: number
+  maxZ: number
+}
+const inside = (obs: Obstacle[], x: number, z: number, pad = 0.18) =>
   obs.some((o) => x > o.minX - pad && x < o.maxX + pad && z > o.minZ - pad && z < o.maxZ + pad)
 
 /* ───────── 토끼 ───────── */
 
-type RabbitMode = 'hop' | 'loaf' | 'flop' | 'binky' | 'nibble' | 'sniff'
+type RabbitMode = 'hop' | 'loaf' | 'flop' | 'binky' | 'nibble' | 'drink' | 'sniff' | 'potty' | 'hide'
+
+/** 방에 놓인 토끼 살림. x, z = 바닥 위치, rot = 도 (아이템 rot 그대로) */
+export type RabbitPlace = { x: number; z: number; rot: number }
+export type RabbitPlaces = {
+  /** 배변판: 밥그릇·물그릇까지 같이 있는 판. 여기서 먹고 마시고 쌈 */
+  pan?: RabbitPlace
+  /** 숨숨집: 앞(+z)이 열려 있어서 들어가서 숨음 */
+  house?: RabbitPlace & { rect: Obstacle }
+}
+
+/** 아이템 기준 좌표 → 방 좌표 */
+function toRoom(p: RabbitPlace, lx: number, lz: number) {
+  const r = (p.rot * Math.PI) / 180
+  return new Vector3(p.x + lx * Math.cos(r) + lz * Math.sin(r), 0, p.z - lx * Math.sin(r) + lz * Math.cos(r))
+}
 
 /** 지금 하는 일에 따라 다음 행동 고르기 */
-function nextRabbitMode(kind: ActivityKind): RabbitMode {
+function nextRabbitMode(kind: ActivityKind, places: RabbitPlaces): RabbitMode {
   const r = Math.random()
+  const q = Math.random()
+  // 살림이 있으면 가끔 찾아감: 배변판에서 볼일·물, 숨숨집에 쏙
+  if (places.pan && q < (kind === 'sleep' ? 0.05 : 0.1)) return 'potty'
+  if (places.pan && q < (kind === 'sleep' ? 0.08 : 0.17)) return 'drink'
+  if (places.house && q < (kind === 'sleep' ? 0.6 : 0.27)) return 'hide'
   if (kind === 'sleep') return r < 0.55 ? 'loaf' : 'flop'
   if (kind === 'eat') return r < 0.7 ? 'nibble' : 'hop'
   if (kind === 'exercise') return r < 0.5 ? 'binky' : 'hop'
@@ -39,37 +65,52 @@ const MODE_TIME: Record<RabbitMode, [number, number]> = {
   loaf: [6, 14],
   flop: [6, 16],
   binky: [1.1, 1.1],
-  nibble: [4, 9],
+  nibble: [5, 10],
+  drink: [3, 6],
   sniff: [2, 4],
+  potty: [8, 15],
+  hide: [15, 40],
 }
 
+/** 배변판 위 자리 (판 기준). 그릇은 판 뒤쪽(-z), 토끼는 그 앞에서 뒤를 보고 먹음 */
+export const PAN_SCALE = 0.48
+export const PAN = { food: [-0.28 * PAN_SCALE, -0.16 * PAN_SCALE], water: [0.3 * PAN_SCALE, -0.18 * PAN_SCALE] } as const
+
 const MAX_POOP = 60
-const SCALE = 1.5
+/** 토끼 크기 (모델 기준 배율) */
+const SCALE = 1.4
 
 export function RabbitCharacter({
   kind,
   size,
-  fur = 'white',
+  fur = 'mine',
   obstacles = [],
+  places = {},
 }: {
   kind: ActivityKind
   size: RoomSize
-  fur?: 'white' | 'brown'
+  fur?: RabbitFur
+  /** 피해 다닐 가구 (숨숨집 빼고) */
   obstacles?: Obstacle[]
+  places?: RabbitPlaces
 }) {
-  const color = fur === 'brown' ? '#9a7458' : '#f2efe9'
   const root = useRef<Group>(null)
   const body = useRef<Group>(null)
   const head = useRef<Group>(null)
   const ears = useRef<Group>(null)
   const poopRef = useRef<InstancedMesh>(null)
 
-  const bounds = { x: size.w / 2 - 0.25, z: size.d / 2 - 0.25 }
+  const house = places.house
+  /** 숨숨집도 평소엔 가구 */
+  const blocked = (x: number, z: number, hiding = false) =>
+    inside(obstacles, x, z) || (!!house && !hiding && inside([house.rect], x, z))
+
+  const bounds = { x: size.w / 2 - 0.4, z: size.d / 2 - 0.4 }
   /** 가구 없는 빈 바닥 한 점 */
   const freeSpot = () => {
     for (let i = 0; i < 30; i++) {
       const p = new Vector3(rand(-bounds.x, bounds.x), 0, rand(-bounds.z, bounds.z))
-      if (!inside(obstacles, p.x, p.z)) return p
+      if (!blocked(p.x, p.z)) return p
     }
     return new Vector3(0, 0, bounds.z * 0.8)
   }
@@ -78,6 +119,10 @@ export function RabbitCharacter({
     until: 0,
     pos: freeSpot(),
     target: new Vector3(),
+    /** 찾아가는 길 (차례대로). 비면 도착 */
+    path: [] as Vector3[],
+    /** 도착하면 볼 방향 */
+    face: null as number | null,
     yaw: rand(0, Math.PI * 2),
     modeStart: 0,
     flopSide: 1,
@@ -96,7 +141,7 @@ export function RabbitCharacter({
     const mesh = poopRef.current
     if (!mesh) return
     state.current.poops.forEach((p, i) => {
-      dummy.position.set(p.x, 0.018, p.z)
+      dummy.position.set(p.x, p.y + 0.026, p.z)
       dummy.scale.setScalar(1)
       dummy.updateMatrix()
       mesh.setMatrixAt(i, dummy.matrix)
@@ -106,26 +151,65 @@ export function RabbitCharacter({
   }
   useLayoutEffect(drawPoops)
 
+  /** 배변판 위에 있나 (판 높이만큼 올라섬) */
+  const onPan = (x: number, z: number) => {
+    const pan = places.pan
+    if (!pan) return false
+    const r = (pan.rot * Math.PI) / 180
+    const dx = x - pan.x
+    const dz = z - pan.z
+    const lx = dx * Math.cos(r) - dz * Math.sin(r)
+    const lz = dx * Math.sin(r) + dz * Math.cos(r)
+    return Math.abs(lx) < 0.6 * PAN_SCALE && Math.abs(lz) < 0.42 * PAN_SCALE
+  }
+
   useFrame(({ clock }, delta) => {
     const t = clock.elapsedTime
     const s = state.current
     const dt = Math.min(delta, 0.1)
 
     if (t > s.until) {
-      s.mode = nextRabbitMode(kind)
+      s.mode = nextRabbitMode(kind, places)
       const [a, b] = MODE_TIME[s.mode]
       s.modeStart = t
       s.until = t + rand(a, b) * (kind === 'sleep' ? 3 : 1)
       s.flopSide = Math.random() < 0.5 ? -1 : 1
+      s.path = []
+      s.face = null
       if (s.mode === 'hop') s.target.copy(freeSpot())
+      // 풀어 키우는 토끼: 밥·물·볼일은 배변판까지, 숨을 땐 숨숨집 안까지 깡총깡총 가서
+      const pan = places.pan
+      const turn = (p: RabbitPlace, local: number) => ((p.rot + local) * Math.PI) / 180
+      if (pan && (s.mode === 'nibble' || s.mode === 'drink')) {
+        const [bx] = s.mode === 'nibble' ? PAN.food : PAN.water
+        s.path = [toRoom(pan, bx, 0.14)]
+        s.face = turn(pan, 180)
+      } else if (pan && s.mode === 'potty') {
+        s.path = [toRoom(pan, rand(-0.08, 0.08), 0.03)]
+        s.face = turn(pan, rand(-60, 60))
+      } else if (house && s.mode === 'hide') {
+        // 문 앞까지 갔다가 안으로. 안에서는 문 쪽(밖)을 보고 웅크림
+        s.path = [toRoom(house, 0, 0.45), toRoom(house, 0, 0.04)]
+        s.face = turn(house, 0)
+      }
+      // 숨숨집 안에 있었으면 일단 문으로 나옴
+      if (house && s.mode !== 'hide' && inside([house.rect], s.pos.x, s.pos.z)) s.path.unshift(toRoom(house, 0, 0.45))
+      if (s.path.length) s.until = t + 20 // 못 가면 포기
     }
     const local = t - s.modeStart
+    const arrived = s.path.length === 0
 
-    // 똥: 자는 동안엔 뜸하게. 엉덩이 뒤쪽에 떨굼
+    // 똥: 자는 동안엔 뜸하게. 엉덩이 뒤쪽에 떨굼. 배변판에선 연달아
     if (t > s.nextPoop) {
-      s.nextPoop = t + (kind === 'sleep' ? rand(15, 30) : rand(4, 10))
+      const sitting = s.mode === 'potty' && arrived
+      s.nextPoop = t + (sitting ? rand(1.5, 3) : kind === 'sleep' ? rand(15, 30) : rand(4, 10))
       const back = new Vector3(-Math.sin(s.yaw), 0, -Math.cos(s.yaw)).multiplyScalar(0.14 * SCALE)
-      s.poops.push(s.pos.clone().add(back).add(new Vector3(rand(-0.03, 0.03), 0, rand(-0.03, 0.03))))
+      const at = s.pos
+        .clone()
+        .add(back)
+        .add(new Vector3(rand(-0.03, 0.03), 0, rand(-0.03, 0.03)))
+      at.y = onPan(at.x, at.z) ? 0.035 * PAN_SCALE : 0
+      s.poops.push(at)
       if (s.poops.length > MAX_POOP) s.poops.shift()
       drawPoops()
     }
@@ -137,49 +221,92 @@ export function RabbitCharacter({
     let headDip = 0
     let earDrop = 0
 
-    switch (s.mode) {
-      case 'hop': {
-        const to = s.target.clone().sub(s.pos)
-        const dist = to.length()
-        if (dist > 0.03) {
-          s.yaw = Math.atan2(to.x, to.z)
-          const next = s.pos.clone().addScaledVector(to.normalize(), Math.min(dist, dt * 0.45))
-          // 가구에 막히면 그 자리에서 멈추고 다른 데로
-          if (inside(obstacles, next.x, next.z)) s.until = Math.min(s.until, t)
-          else s.pos.copy(next)
-          const phase = (t * 3.2) % 1
-          y = Math.sin(phase * Math.PI) * 0.06
-          tilt = Math.sin(phase * Math.PI * 2) * 0.15
-        } else s.until = Math.min(s.until, t + 0.3)
-        break
+    /** 목표까지 깡총깡총. 도착하면 true. free=목표가 빈 바닥이라 막히면 다른 데로 */
+    const walk = (to3: Vector3, free: boolean) => {
+      const to = to3.clone().sub(s.pos)
+      const dist = to.length()
+      if (dist <= 0.03) {
+        if (free) s.until = Math.min(s.until, t + 0.3)
+        return true
       }
-      case 'binky': {
-        // 점프하면서 공중에서 몸을 비틀기
-        const p = Math.min(1, local / 1.1)
-        y = Math.sin(p * Math.PI) * 0.22
-        roll = Math.sin(p * Math.PI * 2) * 0.9
-        tilt = -0.3 * Math.sin(p * Math.PI)
-        break
-      }
-      case 'loaf':
-        squash = 0.82
-        earDrop = 0.9
-        headDip = 0.15
-        break
-      case 'flop': {
-        // 갑자기 옆으로 휙
-        const p = Math.min(1, local / 0.35)
-        roll = s.flopSide * (Math.PI / 2) * p
-        earDrop = 1.2
-        break
-      }
-      case 'nibble':
-        headDip = 0.35 + Math.sin(t * 14) * 0.05
-        break
-      case 'sniff':
-        headDip = -0.1 + Math.sin(t * 9) * 0.03
-        break
+      s.yaw = Math.atan2(to.x, to.z)
+      const next = s.pos.clone().addScaledVector(to.normalize(), Math.min(dist, dt * 0.7))
+      const hiding = s.mode === 'hide'
+      // 가구에 막히면: 그냥 돌아다니던 거면 다른 데로, 찾아가던 거면 옆으로 비켜서 계속
+      // 숨숨집 안으로 들어가는 중이거나 안에서 나오는 중이면 집 벽은 무시
+      const throughDoor = (hiding && s.path.length === 1) || (!!house && inside([house.rect], s.pos.x, s.pos.z))
+      if (!throughDoor && blocked(next.x, next.z, hiding)) {
+        if (free) s.until = Math.min(s.until, t)
+        else {
+          const side = new Vector3(Math.cos(s.yaw), 0, -Math.sin(s.yaw)).multiplyScalar(dt * 0.7)
+          const alt = s.pos.clone().add(side)
+          if (!blocked(alt.x, alt.z, hiding)) s.pos.copy(alt)
+          else s.until = Math.min(s.until, t)
+        }
+      } else s.pos.copy(next)
+      const phase = (t * 3.2) % 1
+      y = Math.sin(phase * Math.PI) * 0.1
+      tilt = Math.sin(phase * Math.PI * 2) * 0.15
+      return false
     }
+
+    if (!arrived) {
+      if (walk(s.path[0], false)) {
+        s.path.shift()
+        if (s.path.length === 0) {
+          // 도착한 다음부터 시간 잼
+          const [a, b] = MODE_TIME[s.mode]
+          s.modeStart = t
+          s.until = t + rand(a, b) * (kind === 'sleep' && s.mode === 'hide' ? 3 : 1)
+          if (s.face !== null) s.yaw = s.face
+        }
+      }
+    } else {
+      switch (s.mode) {
+        case 'hop':
+          walk(s.target, true)
+          break
+        case 'binky': {
+          // 점프하면서 공중에서 몸을 비틀기
+          const p = Math.min(1, local / 1.1)
+          y = Math.sin(p * Math.PI) * 0.35
+          roll = Math.sin(p * Math.PI * 2) * 0.9
+          tilt = -0.3 * Math.sin(p * Math.PI)
+          break
+        }
+        case 'loaf':
+        case 'potty':
+          squash = 0.82
+          earDrop = 0.9
+          headDip = 0.15
+          break
+        case 'hide':
+          // 집 안에선 귀 착 붙이고 납작 (얼굴은 문 밖으로 빼꼼)
+          squash = 0.7
+          earDrop = 1.35
+          headDip = 0.1
+          break
+        case 'flop': {
+          // 갑자기 옆으로 휙
+          const p = Math.min(1, local / 0.35)
+          roll = s.flopSide * (Math.PI / 2) * p
+          earDrop = 1.2
+          break
+        }
+        case 'nibble':
+          headDip = 0.35 + Math.sin(t * 14) * 0.05
+          break
+        case 'drink':
+          // 할짝할짝
+          headDip = 0.45 + Math.sin(t * 18) * 0.03
+          break
+        case 'sniff':
+          headDip = -0.1 + Math.sin(t * 9) * 0.03
+          break
+      }
+    }
+    // 배변판 위면 판 두께만큼 올라섬
+    if (onPan(s.pos.x, s.pos.z)) y += 0.035 * PAN_SCALE
 
     if (root.current) {
       root.current.position.set(s.pos.x, y, s.pos.z)
@@ -187,9 +314,9 @@ export function RabbitCharacter({
     }
     if (body.current) {
       body.current.rotation.set(tilt, 0, roll)
-      body.current.scale.set(1 / Math.sqrt(squash), squash, 1)
+      body.current.scale.set(SCALE / Math.sqrt(squash), SCALE * squash, SCALE)
       // 옆으로 돌면 몸통 중심이 바닥 밑으로 들어가니까 그만큼 띄움
-      body.current.position.y = Math.abs(Math.sin(roll)) * 0.11
+      body.current.position.y = Math.abs(Math.sin(roll)) * 0.073 * SCALE
     }
     if (head.current) head.current.rotation.x = headDip + Math.sin(t * 11) * 0.015
     if (ears.current) ears.current.rotation.x = earDrop + (s.mode === 'sniff' ? Math.sin(t * 2) * 0.2 : 0)
@@ -199,42 +326,11 @@ export function RabbitCharacter({
     <>
       <group ref={root}>
         <group ref={body} scale={SCALE}>
-          <mesh position={[0, 0.09, -0.02]} scale={[0.09, 0.08, 0.12]}>
-            <sphereGeometry args={[1, 16, 12]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-          <mesh position={[0, 0.07, -0.13]}>
-            <sphereGeometry args={[0.025, 8, 6]} />
-            <meshStandardMaterial color="#ffffff" />
-          </mesh>
-          <group ref={head} position={[0, 0.15, 0.08]}>
-            <mesh scale={[0.06, 0.055, 0.065]}>
-              <sphereGeometry args={[1, 14, 10]} />
-              <meshStandardMaterial color={color} />
-            </mesh>
-            {[-1, 1].map((sx) => (
-              <mesh key={sx} position={[sx * 0.03, 0.01, 0.05]}>
-                <sphereGeometry args={[0.008, 6, 4]} />
-                <meshBasicMaterial color="#1a1a1a" />
-              </mesh>
-            ))}
-            <mesh position={[0, -0.01, 0.064]}>
-              <sphereGeometry args={[0.006, 6, 4]} />
-              <meshStandardMaterial color="#e8a0a0" />
-            </mesh>
-            <group ref={ears} position={[0, 0.04, -0.01]}>
-              {[-1, 1].map((sx) => (
-                <mesh key={sx} position={[sx * 0.025, 0.06, 0]} rotation-z={sx * -0.15} scale={[0.018, 0.07, 0.01]}>
-                  <sphereGeometry args={[1, 8, 6]} />
-                  <meshStandardMaterial color={color} />
-                </mesh>
-              ))}
-            </group>
-          </group>
+          <RabbitBody fur={fur} headRef={head} earsRef={ears} />
         </group>
       </group>
       <instancedMesh ref={poopRef} args={[undefined, undefined, MAX_POOP + 20]} frustumCulled={false}>
-        <sphereGeometry args={[0.018, 8, 6]} />
+        <sphereGeometry args={[0.026, 8, 6]} />
         <meshStandardMaterial color="#4a3426" roughness={1} />
       </instancedMesh>
     </>
@@ -249,7 +345,15 @@ const TRAIL = 80
  * 명주달팽이. 천장에 거꾸로 붙어서 아주 천천히 기어다님 (가끔 벽 위쪽).
  * 지나간 자리엔 반짝이는 점액 자국. 잘 때는 껍데기 속으로 쏙
  */
-export function SnailCharacter({ kind, size, onCeiling = true }: { kind: ActivityKind; size: RoomSize; onCeiling?: boolean }) {
+export function SnailCharacter({
+  kind,
+  size,
+  onCeiling = true,
+}: {
+  kind: ActivityKind
+  size: RoomSize
+  onCeiling?: boolean
+}) {
   const root = useRef<Group>(null)
   const bodyRef = useRef<Group>(null)
   const trailRef = useRef<Points>(null)
@@ -311,7 +415,11 @@ export function SnailCharacter({ kind, size, onCeiling = true }: { kind: Activit
 
   // 천장이면 거꾸로 매달림 (y = 천장 높이, 위아래 뒤집기)
   return (
-    <group position-y={onCeiling ? size.h - 0.005 : 0} rotation-x={onCeiling ? Math.PI : 0} scale={[1, 1, onCeiling ? -1 : 1]}>
+    <group
+      position-y={onCeiling ? size.h - 0.005 : 0}
+      rotation-x={onCeiling ? Math.PI : 0}
+      scale={[1, 1, onCeiling ? -1 : 1]}
+    >
       <points ref={trailRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[trailPositions, 3]} />

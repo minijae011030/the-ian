@@ -101,7 +101,7 @@ function Shot({ entry, onShot }: { entry: Shootable; onShot: (key: string, url: 
 
 function CharacterThumb({ entry }: { entry: CharacterEntry }) {
   const config = { ...DEFAULT_CHARACTER, ...entry.patch }
-  if (config.kind === 'rabbit') return <Rabbit color={config.fur === 'brown' ? '#9a7458' : '#f2efe9'} />
+  if (config.kind === 'rabbit') return <Rabbit fur={config.fur} />
   if (config.kind === 'snail') return <SnailCharacter kind="rest" size={{ w: 0.4, d: 0.4, h: 1 }} onCeiling={false} />
   return <Character pose="stand" hands="down" look={config} />
 }

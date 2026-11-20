@@ -30,6 +30,7 @@ export type Entry = ObjectEntry | BackgroundEntry | CharacterEntry
 const CHARACTER_ENTRIES: CharacterEntry[] = (
   [
   { patch: { kind: 'human' }, name: '나' },
+  { patch: { kind: 'rabbit', fur: 'mine' }, name: '우리 토끼' },
   { patch: { kind: 'rabbit', fur: 'white' }, name: '흰 토끼' },
   { patch: { kind: 'rabbit', fur: 'brown' }, name: '갈색 토끼' },
   { patch: { kind: 'snail' }, name: '명주달팽이' },

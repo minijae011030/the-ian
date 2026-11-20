@@ -4,17 +4,33 @@ import type { ActivityKind } from '../../data/rooms'
 import { CATALOG } from '../../items/catalog'
 import { type CharacterConfig, DEFAULT_CHARACTER, type PlacedItem, type RoomSize, type Spot } from '../rooms/types'
 import { Character } from './Character'
-import { type Obstacle, RabbitCharacter, SnailCharacter } from './Pets'
+import { type Obstacle, RabbitCharacter, type RabbitPlaces, SnailCharacter } from './Pets'
 
-/** 바닥에 서 있는 가구들의 사각형 (러그처럼 납작한 건 빼고) */
+/** 아이템이 바닥에서 차지하는 사각형 */
+function rectOf(it: PlacedItem): Obstacle {
+  let [w, d] = CATALOG[it.item].footprint
+  if ((((Math.round(it.rot / 90) % 4) + 4) % 4) % 2 === 1) [w, d] = [d, w]
+  return { minX: it.x - w / 2, maxX: it.x + w / 2, minZ: it.z - d / 2, maxZ: it.z + d / 2 }
+}
+
+/** 바닥에 서 있는 가구들 (러그처럼 납작한 거랑 숨숨집은 빼고) */
 function obstaclesOf(items: PlacedItem[]): Obstacle[] {
   return items.flatMap((it) => {
     const def = CATALOG[it.item]
-    if (!def || def.place !== 'floor' || def.flat) return []
-    let [w, d] = def.footprint
-    if ((((Math.round(it.rot / 90) % 4) + 4) % 4) % 2 === 1) [w, d] = [d, w]
-    return [{ minX: it.x - w / 2, maxX: it.x + w / 2, minZ: it.z - d / 2, maxZ: it.z + d / 2 }]
+    if (!def || def.place !== 'floor' || def.flat || it.item === 'rabbit-house') return []
+    return [rectOf(it)]
   })
+}
+
+/** 풀어 키우는 토끼가 찾아가는 곳: 배변판(밥·물·볼일), 숨숨집 */
+function placesOf(items: PlacedItem[]): RabbitPlaces {
+  const find = (id: string) => items.find((i) => i.item === id)
+  const pan = find('rabbit-toilet')
+  const house = find('rabbit-house')
+  return {
+    pan: pan && { x: pan.x, z: pan.z, rot: pan.rot },
+    house: house && { x: house.x, z: house.z, rot: house.rot, rect: rectOf(house) },
+  }
 }
 
 /**
@@ -39,7 +55,9 @@ export function RoomCharacter({
   onHumanPointerDown?: (e: ThreeEvent<PointerEvent>) => void
 }) {
   const obstacles = useMemo(() => obstaclesOf(items), [items])
-  if (config.kind === 'rabbit') return <RabbitCharacter kind={kind} size={size} fur={config.fur} obstacles={obstacles} />
+  const places = useMemo(() => placesOf(items), [items])
+  if (config.kind === 'rabbit')
+    return <RabbitCharacter kind={kind} size={size} fur={config.fur} obstacles={obstacles} places={places} />
   if (config.kind === 'snail') return <SnailCharacter kind={kind} size={size} />
   if (!spot) return null
   return (

@@ -37,7 +37,7 @@ export type HumanLook = {
 /** 방에 사는 캐릭터. 방마다 따로 */
 export type CharacterConfig = HumanLook & {
   kind: 'human' | 'rabbit' | 'snail'
-  fur?: 'white' | 'brown'
+  fur?: 'mine' | 'white' | 'brown'
 }
 
 export const DEFAULT_CHARACTER: CharacterConfig = { kind: 'human', outfit: 'hoodie', hairColor: 'black', accessory: 'none' }
