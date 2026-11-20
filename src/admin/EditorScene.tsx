@@ -12,12 +12,14 @@ import type { LayoutData, PlacedItem, RoomSize } from '../scene/rooms/types'
 import { ActionBar } from './ActionBar'
 import { findOverlaps, type Placement, placeAt, ridersOf } from './placement'
 
+/** 내려다보는 각도 (카메라 높이 8, 수평거리 10) */
+const POLAR = Math.atan2(10, 8)
+
 type Props = {
   size: RoomSize
   layout: LayoutData
   selectedId: string | null
   previewKind: ActivityKind
-  view: number
   /** 아이템 상자에서 고른, 아직 안 놓은 물건 */
   placing: { item: string; variant: string } | null
   onSelect: (id: string | null) => void
@@ -57,7 +59,6 @@ function Scene({
   layout,
   selectedId,
   previewKind,
-  view,
   placing,
   onSelect,
   onDragStart,
@@ -90,15 +91,14 @@ function Scene({
     camera.updateProjectionMatrix()
   }, [camera, viewport.width, viewport.height, size.w, size.d, size.h])
 
-  // 시점: 45도씩 돌린 4방향 중 하나
+  // 처음 시점: 방을 비스듬히 내려다봄. 그다음은 빈 곳을 끌어서 빙글 돌림
   useEffect(() => {
-    const angle = Math.PI / 4 + (view * Math.PI) / 2
     const target = new Vector3(0, size.h * 0.35, 0)
-    camera.position.set(Math.sin(angle) * 10, 8, Math.cos(angle) * 10).add(target)
+    camera.position.set(Math.sin(Math.PI / 4) * 10, 8, Math.cos(Math.PI / 4) * 10).add(target)
     camera.lookAt(target)
     controls.current?.target.copy(target)
     controls.current?.update()
-  }, [view, camera, size.h])
+  }, [camera, size.h])
 
   // 드래그 끝
   useEffect(() => {
@@ -167,7 +167,17 @@ function Scene({
 
   return (
     <>
-      <OrbitControls ref={controls} enableRotate={false} enableZoom={false} enableDamping={false} screenSpacePanning />
+      {/* 빈 곳 끌기 = 옆으로 돌리기 (위아래 각도는 고정), 오른쪽 끌기 = 화면 이동 */}
+      <OrbitControls
+        ref={controls}
+        enableZoom={false}
+        enableDamping
+        dampingFactor={0.12}
+        rotateSpeed={0.6}
+        minPolarAngle={POLAR}
+        maxPolarAngle={POLAR}
+        screenSpacePanning
+      />
       <RoomShell size={size} lightOn={lit} wall={layout.wall} floor={layout.floor} />
       <Grid
         args={[size.w, size.d]}

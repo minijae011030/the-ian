@@ -3,7 +3,6 @@ import { type ActivityKind, ROOMS } from '../data/rooms'
 import { defaultLayout, fetchLayout, roomSize } from '../scene/rooms/layoutData'
 import type { LayoutData, PlacedItem } from '../scene/rooms/types'
 import { Dropdown } from './Dropdown'
-import { RotateIcon } from './icons'
 import { EditorScene } from './EditorScene'
 import { type Entry, ENTRIES, type Tab, TABS } from './entries'
 import { commitFiles, type GithubSettings, loadSettings, readFile, saveSettings } from './github'
@@ -32,7 +31,6 @@ export function AdminApp() {
   const [saved, setSaved] = useState<Record<string, string>>({}) // 마지막으로 불러오거나 저장한 상태
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<ActivityKind>('work')
-  const [view, setView] = useState(0)
   const [placing, setPlacing] = useState<{ item: string; variant: string } | null>(null)
   const [tab, setTab] = useState<Tab>('all')
   const [showSettings, setShowSettings] = useState(false)
@@ -230,12 +228,6 @@ export function AdminApp() {
         />
 
         <div className="mx-auto flex shrink-0 items-center gap-1.5">
-          <button className="tool-btn px-0" title="시점 왼쪽으로" onClick={() => setView((v) => (v + 3) % 4)}>
-            <RotateIcon flip />
-          </button>
-          <button className="tool-btn px-0" title="시점 오른쪽으로" onClick={() => setView((v) => (v + 1) % 4)}>
-            <RotateIcon />
-          </button>
           <button className="tool-btn" onClick={undo}>
             되돌리기
           </button>
@@ -300,7 +292,6 @@ export function AdminApp() {
             layout={layout}
             selectedId={selectedId}
             previewKind={previewKind}
-            view={view}
             placing={placing}
             onPlace={placeItem}
             onSelect={(id) => {
