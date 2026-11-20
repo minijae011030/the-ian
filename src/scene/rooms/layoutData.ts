@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { MathUtils, Vector3 } from 'three'
-import type { ActivityKind } from '../../data/rooms'
+import type { ActivityKind, Room } from '../../data/rooms'
 import { CATALOG } from '../../items/catalog'
+import { BUILDING, ROOM_DEPTH } from '../building/config'
+import { roomGeometry } from '../building/rooms'
 import type { LayoutData, PlacedItem, RoomSize, Spot } from './types'
 
 /**
@@ -11,7 +13,7 @@ import type { LayoutData, PlacedItem, RoomSize, Spot } from './types'
  */
 const cache = new Map<string, LayoutData | null>()
 
-async function fetchLayout(roomId: string): Promise<LayoutData | null> {
+export async function fetchLayout(roomId: string): Promise<LayoutData | null> {
   if (cache.has(roomId)) return cache.get(roomId)!
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}data/layouts/${roomId}.json`, { cache: 'no-cache' })
@@ -21,6 +23,15 @@ async function fetchLayout(roomId: string): Promise<LayoutData | null> {
   } catch {
     cache.set(roomId, null)
     return null
+  }
+}
+
+/** 방 안쪽 크기. 위아래 슬래브 두께만큼 빼고, 바닥·천장을 슬래브 면에서 살짝 띄움 (z-fighting 방지) */
+export function roomSize(room: Room): RoomSize {
+  return {
+    w: roomGeometry(room).interiorWidth,
+    d: ROOM_DEPTH,
+    h: BUILDING.floorHeight - 0.22 - 0.024,
   }
 }
 
