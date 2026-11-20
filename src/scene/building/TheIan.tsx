@@ -3,7 +3,7 @@ import { SIDEWALK_HEIGHT } from '../surroundings/layout'
 import { BUILDING, BUILDING_HEIGHT } from './config'
 import { Frame } from './Frame'
 import { Sign } from './Sign'
-import { RoomInterior } from './RoomInterior'
+import { RoomView } from '../rooms/RoomView'
 import { Windows } from './Windows'
 
 const SIDE_WALL_INSET = 0.06
@@ -33,7 +33,7 @@ export function TheIan() {
       ))}
 
       <Windows />
-      <RoomInterior />
+      <RoomView />
       <Frame />
       <Sign />
     </group>
