@@ -25,7 +25,7 @@
 
 /* 상단바 기본 버튼 */
 @utility tool-btn {
-  @apply flex h-[30px] min-w-[30px] cursor-pointer items-center justify-center rounded-[3px] border border-line bg-raised px-2.5 hover:bg-hover;
+  @apply flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-[3px] border border-line bg-raised px-2.5 whitespace-nowrap hover:bg-hover;
 }
 
 /* 상단바 입력칸 */

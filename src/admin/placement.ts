@@ -15,13 +15,27 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 
 export type Placement = Pick<PlacedItem, 'x' | 'y' | 'z'> & { rot?: number }
 
+/** 아이템 기준 사각형(cx, cz, w, d)을 회전 반영해서 방 좌표 사각형으로 */
+function rectBox(placed: PlacedItem, rect: { x: number; z: number; w: number; d: number }) {
+  const r = ((Math.round(placed.rot / 90) % 4) + 4) % 4
+  const t = (r * Math.PI) / 2
+  // three.js y축 회전: x' = x·cos + z·sin, z' = −x·sin + z·cos
+  const cx = placed.x + rect.x * Math.cos(t) + rect.z * Math.sin(t)
+  const cz = placed.z - rect.x * Math.sin(t) + rect.z * Math.cos(t)
+  const [w, d] = r % 2 === 1 ? [rect.d, rect.w] : [rect.w, rect.d]
+  return { minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2 }
+}
+
 /** 회전 반영한 바닥 사각형 */
 export function footprintBox(placed: PlacedItem) {
+  const [w, d] = CATALOG[placed.item]?.footprint ?? [0.3, 0.3]
+  return rectBox(placed, { x: 0, z: 0, w, d })
+}
+
+/** 소품을 올릴 수 있는 윗면 사각형 */
+function topBox(placed: PlacedItem) {
   const def = CATALOG[placed.item]
-  let [fw, fd] = def?.footprint ?? [0.3, 0.3]
-  const r = ((Math.round(placed.rot / 90) % 4) + 4) % 4
-  if (r % 2 === 1) [fw, fd] = [fd, fw]
-  return { minX: placed.x - fw / 2, maxX: placed.x + fw / 2, minZ: placed.z - fd / 2, maxZ: placed.z + fd / 2 }
+  return def?.topRect ? rectBox(placed, def.topRect) : footprintBox(placed)
 }
 
 function hitPlane(ray: Ray, plane: Plane) {
@@ -37,7 +51,7 @@ function surfaceHit(ray: Ray, layout: LayoutData, excludeId?: string) {
     if (top === undefined || placed.id === excludeId) continue
     const point = hitPlane(ray, new Plane(new Vector3(0, 1, 0), -(placed.y + top)))
     if (!point) continue
-    const box = footprintBox(placed)
+    const box = topBox(placed)
     if (point.x < box.minX || point.x > box.maxX || point.z < box.minZ || point.z > box.maxZ) continue
     const dist = point.distanceTo(ray.origin)
     if (!best || dist < best.dist) best = { point, dist }
@@ -127,7 +141,7 @@ export function findOverlaps(layout: LayoutData) {
 export function ridersOf(layout: LayoutData, base: PlacedItem) {
   const top = CATALOG[base.item]?.top
   if (top === undefined) return []
-  const box = footprintBox(base)
+  const box = topBox(base)
   return layout.items.filter((it) => {
     if (it.id === base.id || CATALOG[it.item]?.place !== 'surface') return false
     if (Math.abs(it.y - (base.y + top)) > 0.03) return false

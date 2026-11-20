@@ -26,12 +26,12 @@ export function Dropdown<T extends string>({
   }, [open])
 
   return (
-    <div className="relative" ref={ref} style={{ width }}>
+    <div className="relative shrink-0" ref={ref} style={{ width }}>
       <button
         className={`flex h-[30px] w-full cursor-pointer items-center justify-between gap-2 rounded-[3px] border border-line bg-ink px-2.5 leading-none ${bold ? 'font-bold' : ''}`}
         onClick={() => setOpen((v) => !v)}
       >
-        <span>{current?.label}</span>
+        <span className="truncate whitespace-nowrap">{current?.label}</span>
         <svg className="flex-none text-mute" width="10" height="6" viewBox="0 0 10 6" aria-hidden>
           <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

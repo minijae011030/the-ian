@@ -4,8 +4,7 @@
   "floor": "wood",
   "items": [
     { "id": "bed", "item": "bed", "x": -1.16, "y": 0, "z": -0.55, "rot": 0, "variant": "lilac" },
-    { "id": "desk", "item": "desk", "x": 1.41, "y": 0, "z": 0.15, "rot": 90, "variant": "long" },
-    { "id": "chair", "item": "chair", "x": 0.86, "y": 0, "z": 0.15, "rot": 90, "variant": "charcoal" },
+    { "id": "desk-set", "item": "desk-set", "x": 1.11, "y": 0, "z": 0.15, "rot": 90, "variant": "charcoal" },
     { "id": "laptop", "item": "laptop", "x": 1.39, "y": 0.74, "z": 0.2, "rot": 90, "variant": "cover-letter" },
     { "id": "lamp", "item": "desk-lamp", "x": 1.53, "y": 0.74, "z": -0.35, "rot": 0 },
     { "id": "books", "item": "books", "x": 1.46, "y": 0.74, "z": 0.63, "rot": 90, "variant": "job" },

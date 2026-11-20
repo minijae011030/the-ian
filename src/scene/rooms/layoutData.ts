@@ -60,8 +60,8 @@ export function defaultLayout({ w, d }: RoomSize): LayoutData {
   const deskX = w / 2 - 0.3
   const items: PlacedItem[] = [
     { id: 'bed', item: 'bed', x: -w / 2 + 0.55, y: 0, z: -d / 2 + 1.05, rot: 0 },
-    { id: 'desk', item: 'desk', x: deskX, y: 0, z: deskZ, rot: 90 },
-    { id: 'chair', item: 'chair', x: w / 2 - 0.85, y: 0, z: deskZ, rot: 90 },
+    // 세트 중심 = 책상 판보다 0.3 의자 쪽 (rot 90이면 아이템의 +z가 방의 +x)
+    { id: 'desk-set', item: 'desk-set', x: deskX - 0.3, y: 0, z: deskZ, rot: 90 },
     { id: 'laptop', item: 'laptop', x: deskX - 0.02, y: 0.74, z: deskZ + 0.05, rot: 90 },
     { id: 'lamp', item: 'desk-lamp', x: deskX + 0.12, y: 0.74, z: deskZ - 0.4, rot: 0 },
     { id: 'rug', item: 'rug', x: 0, y: 0, z: 0.3, rot: 0 },

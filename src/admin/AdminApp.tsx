@@ -229,7 +229,7 @@ export function AdminApp() {
           }}
         />
 
-        <div className="mx-auto flex items-center gap-1.5">
+        <div className="mx-auto flex shrink-0 items-center gap-1.5">
           <button className="tool-btn px-0" title="시점 왼쪽으로" onClick={() => setView((v) => (v + 3) % 4)}>
             <RotateIcon flip />
           </button>
@@ -247,7 +247,7 @@ export function AdminApp() {
           />
         </div>
 
-        <div className="relative flex items-center gap-1.5">
+        <div className="relative flex shrink-0 items-center gap-1.5">
           {status && (
             <span className={`text-xs ${status.error ? 'text-danger' : 'text-mute'}`}>
               {status.url ? (
@@ -260,11 +260,11 @@ export function AdminApp() {
             </span>
           )}
           <button
-            className="h-[30px] cursor-pointer rounded-[3px] border border-[#7a2a2a] bg-[#5e1f22] px-3.5 font-bold text-white disabled:cursor-default disabled:border-line disabled:bg-raised disabled:text-[#6b707c]"
+            className="h-[30px] shrink-0 cursor-pointer rounded-[3px] whitespace-nowrap border border-[#7a2a2a] bg-[#5e1f22] px-3.5 font-bold text-white disabled:cursor-default disabled:border-line disabled:bg-raised disabled:text-[#6b707c]"
             disabled={saving || dirtyIds.length === 0}
             onClick={save}
           >
-            미니룸 저장하기
+            <span className="max-[960px]:hidden">미니룸 </span>저장하기
           </button>
           <button className="tool-btn" onClick={() => setShowSettings((v) => !v)}>
             ⚙

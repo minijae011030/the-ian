@@ -33,6 +33,8 @@ export type ItemDef = {
   footprint: [number, number]
   /** 위에 소품을 올릴 수 있으면 그 윗면 높이 (책상 0.74 등) */
   top?: number
+  /** 윗면이 바닥 크기 일부일 때 그 범위 (아이템 기준, 회전 0) */
+  topRect?: { x: number; z: number; w: number; d: number }
   /** 바닥에 깔리는 납작한 것 (러그). 다른 가구랑 겹쳐도 괜찮음 */
   flat?: boolean
   /** 첫 번째가 기본값 */
@@ -63,12 +65,10 @@ export const VARIANT_INFO: Record<string, { name: string; color?: string }> = {
   lilac: { name: '연보라', color: BLANKETS.lilac },
   gray: { name: '회색', color: '#8c93a1' },
   red: { name: '빨강', color: BLANKETS.red },
-  charcoal: { name: '진회색', color: CHAIRS.charcoal },
+  charcoal: { name: '검정', color: CHAIRS.charcoal },
   beige: { name: '베이지', color: RUGS.beige },
   sand: { name: '모래색', color: RUGS.sand },
   wine: { name: '와인', color: RUGS.wine },
-  short: { name: '작은' },
-  long: { name: '큰' },
   suits: { name: '정장' },
   casual: { name: '평상복' },
   job: { name: '취준' },
@@ -91,28 +91,28 @@ export const CATALOG: Record<string, ItemDef> = {
       rest: { pose: 'sit', hands: 'phone', prop: 'phone', seat: 0.5, at: [0.3, 0, 0.5], facing: 90 },
     },
   },
-  desk: {
-    name: '책상',
+  /** 책상+의자 세트. 의자는 책상 앞(-z)에, 앉으면 책상(+z)을 봄 */
+  'desk-set': {
+    name: '책상 세트',
     category: 'furniture',
     place: 'floor',
-    footprint: [1.2, 0.55],
+    footprint: [1.3, 1.15],
     top: 0.74,
-    variants: ['short', 'long'],
-    render: ({ variant }) => <Desk width={variant === 'long' ? 1.3 : 1.1} />,
-  },
-  chair: {
-    name: '의자',
-    category: 'furniture',
-    place: 'floor',
-    footprint: [0.45, 0.45],
+    // 소품 올라가는 건 책상 판 부분만 (의자 위엔 안 올라감)
+    topRect: { x: 0, z: 0.3, w: 1.3, d: 0.55 },
     variants: Object.keys(CHAIRS),
-    render: ({ variant }) => <Chair color={CHAIRS[variant]} />,
+    render: ({ variant }) => (
+      <>
+        <Desk position={[0, 0, 0.3]} width={1.3} />
+        <Chair position={[0, 0, -0.28]} color={CHAIRS[variant]} />
+      </>
+    ),
     uses: {
-      work: { pose: 'sit', hands: 'type', at: [0, 0, -0.02], facing: 0 },
-      study: { pose: 'sit', hands: 'write', at: [0, 0, -0.02], facing: 0 },
-      eat: { pose: 'sit', hands: 'eat', at: [0, 0, -0.02], facing: 0 },
+      work: { pose: 'sit', hands: 'type', at: [0, 0, -0.3], facing: 0 },
+      study: { pose: 'sit', hands: 'write', at: [0, 0, -0.3], facing: 0 },
+      eat: { pose: 'sit', hands: 'eat', at: [0, 0, -0.3], facing: 0 },
       // 화장대가 없는 방에선 책상 앞에서 스킨케어
-      skincare: { pose: 'sit', hands: 'face', at: [0, 0, -0.02], facing: 0, priority: 0 },
+      skincare: { pose: 'sit', hands: 'face', at: [0, 0, -0.3], facing: 0, priority: 0 },
     },
   },
   vanity: {
