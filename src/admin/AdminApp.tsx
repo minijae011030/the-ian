@@ -7,7 +7,7 @@ import { EditorScene } from './EditorScene'
 import { type Entry, ENTRIES, type Tab, TABS } from './entries'
 import { commitFiles, type GithubSettings, loadSettings, readFile, saveSettings } from './github'
 import { KINDS } from './kinds'
-import { type Placement, ridersOf } from './placement'
+import { keepInside, type Placement, ridersOf } from './placement'
 import { useThumbnails } from './Thumbnails'
 
 const layoutPath = (roomId: string) => `public/data/layouts/${roomId}.json`
@@ -120,14 +120,19 @@ export function AdminApp() {
   const turnSelected = useCallback(() => {
     if (!selected || !layout) return
     const spin = (rot: number) => (((rot - 90) % 360) + 360) % 360
+    // 돌렸더니 벽을 뚫으면 방 안으로 밀어넣고, 위 소품도 같은 만큼 같이 밀어줌
+    const turned = { ...selected, rot: spin(selected.rot) }
+    const inside = keepInside(turned, size)
+    const sx = inside.x - selected.x
+    const sz = inside.z - selected.z
     const riders = ridersOf(layout, selected).map((r) => {
       const dx = r.x - selected.x
       const dz = r.z - selected.z
       // y축 기준 -90도 회전: (dx, dz) → (-dz, dx)
-      return { id: r.id, patch: { x: round(selected.x - dz), z: round(selected.z + dx), rot: spin(r.rot) } }
+      return { id: r.id, patch: { x: round(selected.x - dz + sx), z: round(selected.z + dx + sz), rot: spin(r.rot) } }
     })
-    patchMany([{ id: selected.id, patch: { rot: spin(selected.rot) } }, ...riders])
-  }, [selected, layout, patchMany])
+    patchMany([{ id: selected.id, patch: { rot: turned.rot, ...inside } }, ...riders])
+  }, [selected, layout, size, patchMany])
 
   const removeSelected = useCallback(() => {
     if (!selectedId) return

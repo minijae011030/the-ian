@@ -1,7 +1,7 @@
 import { Grid, OrbitControls, useHelper } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BoxHelper, type Group, Plane, Vector3 } from 'three'
+import { BoxHelper, type Group, Plane, Vector2, Vector3 } from 'three'
 import type { ActivityKind } from '../data/rooms'
 import { CATALOG } from '../items/catalog'
 import { Character } from '../scene/character/Character'
@@ -10,7 +10,7 @@ import { PlacedItemMesh } from '../scene/rooms/PlacedItems'
 import { RoomShell } from '../scene/rooms/RoomShell'
 import type { LayoutData, PlacedItem, RoomSize } from '../scene/rooms/types'
 import { ActionBar } from './ActionBar'
-import { findOverlaps, type Placement, placeAt, ridersOf } from './placement'
+import { findOverlaps, isBlocked, type Placement, placeAt, ridersOf, slideTo } from './placement'
 
 /** 내려다보는 각도 (카메라 높이 8, 수평거리 10) */
 const POLAR = Math.atan2(10, 8)
@@ -71,7 +71,10 @@ function Scene({
   const controls = useRef<React.ComponentRef<typeof OrbitControls>>(null)
   const camera = useThree((s) => s.camera)
   const raycaster = useThree((s) => s.raycaster)
-  const pointer = useThree((s) => s.pointer)
+  // 마우스 위치는 직접 계산 (R3F pointer는 마우스가 방향/빼기 바 같은 HTML 위에 올라가면
+  // 그 요소 기준 좌표로 바뀌어서 화면 구석으로 튐 → 물건이 순간이동하던 원인)
+  const pointer = useRef(new Vector2())
+  const [dragging, setDragging] = useState(false)
   const gl = useThree((s) => s.gl)
   const drag = useRef<{
     item: PlacedItem
@@ -100,15 +103,26 @@ function Scene({
     controls.current?.update()
   }, [camera, size.h])
 
-  // 드래그 끝
   useEffect(() => {
+    const move = (e: PointerEvent) => {
+      const rect = gl.domElement.getBoundingClientRect()
+      pointer.current.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+    }
+    // 드래그 끝
     const up = () => {
       drag.current = null
+      setDragging(false)
       if (controls.current) controls.current.enabled = true
     }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerdown', move)
     window.addEventListener('pointerup', up)
-    return () => window.removeEventListener('pointerup', up)
-  }, [])
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerdown', move)
+      window.removeEventListener('pointerup', up)
+    }
+  }, [gl])
 
   // 놓기 모드: 캔버스 클릭 = 미리보기 자리에 놓기
   useEffect(() => {
@@ -119,8 +133,10 @@ function Scene({
     }
     const down = (e: PointerEvent) => {
       if (e.button !== 0 || !ghostRef.current) return
+      const { blocked, ...at } = ghostRef.current as Placement & { blocked?: boolean }
+      if (blocked) return
       placedAt.current = performance.now()
-      onPlace(ghostRef.current, e.shiftKey)
+      onPlace(at, e.shiftKey)
     }
     gl.domElement.addEventListener('pointerdown', down)
     return () => gl.domElement.removeEventListener('pointerdown', down)
@@ -128,10 +144,13 @@ function Scene({
 
   useFrame(() => {
     if (!drag.current && !placing) return
-    raycaster.setFromCamera(pointer, camera)
+    raycaster.setFromCamera(pointer.current, camera)
 
     if (placing) {
-      const at = placeAt(placing.item, raycaster.ray, layout, size)
+      let at = placeAt(placing.item, raycaster.ray, layout, size)
+      // 다른 가구랑 겹치는 자리엔 못 놓음 (미리보기는 빨갛게)
+      const blocked = !!at && isBlocked(layout, { id: '__ghost', item: placing.item, rot: 0, ...at })
+      if (at) at = { ...at, blocked } as Placement & { blocked: boolean }
       const changed = JSON.stringify(at) !== JSON.stringify(ghostRef.current)
       ghostRef.current = at
       if (changed) setGhost(at)
@@ -139,11 +158,19 @@ function Scene({
     }
 
     const d = drag.current!
-    const at = placeAt(d.item.item, raycaster.ray, layout, size, { excludeId: d.item.id, offset: d.offset })
+    const at = placeAt(d.item.item, raycaster.ray, layout, size, {
+      excludeId: d.item.id,
+      offset: d.offset,
+      rot: d.item.rot,
+    })
     if (!at) return
+    // 다른 가구에 막히면 거기서 멈추고 옆으로 미끄러짐
+    const current = layout.items.find((it) => it.id === d.item.id) ?? d.item
+    const { x, z } = slideTo(layout, current, at)
+    if (x === current.x && z === current.z && at.y === current.y) return
     onMove([
-      { id: d.item.id, patch: at },
-      ...d.riders.map((r) => ({ id: r.id, patch: { x: Number((at.x + r.dx).toFixed(2)), z: Number((at.z + r.dz).toFixed(2)) } })),
+      { id: d.item.id, patch: { ...at, x, z } },
+      ...d.riders.map((r) => ({ id: r.id, patch: { x: Number((x + r.dx).toFixed(2)), z: Number((z + r.dz).toFixed(2)) } })),
     ])
   })
 
@@ -158,6 +185,7 @@ function Scene({
     }
     const riders = ridersOf(layout, item).map((r) => ({ id: r.id, dx: r.x - item.x, dz: r.z - item.z }))
     drag.current = { item, offset, riders }
+    setDragging(true)
     if (controls.current) controls.current.enabled = false
     onDragStart()
   }
@@ -210,15 +238,19 @@ function Scene({
       })}
 
       {placing && ghost && (
-        <Selectable outline="#8ab4ff" opacity={0.55} onPointerDown={() => {}}>
+        <Selectable
+          outline={(ghost as Placement & { blocked?: boolean }).blocked ? '#ff4d4d' : '#8ab4ff'}
+          opacity={0.55}
+          onPointerDown={() => {}}
+        >
           <PlacedItemMesh
-            placed={{ id: '__ghost', item: placing.item, variant: placing.variant, rot: 0, ...ghost }}
+            placed={{ id: '__ghost', item: placing.item, variant: placing.variant, rot: 0, x: ghost.x, y: ghost.y, z: ghost.z }}
             lit={lit}
           />
         </Selectable>
       )}
 
-      {selectedId && !placing && (() => {
+      {selectedId && !placing && !dragging && (() => {
         const item = layout.items.find((it) => it.id === selectedId)
         return item ? (
           <ActionBar item={item} onTurn={onTurn} onRemove={onRemove} />

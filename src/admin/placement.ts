@@ -86,21 +86,32 @@ export function placeAt(
   ray: Ray,
   layout: LayoutData,
   size: RoomSize,
-  options: { excludeId?: string; offset?: Vector3 } = {},
+  options: { excludeId?: string; offset?: Vector3; rot?: number } = {},
 ): Placement | null {
   const def = CATALOG[itemId]
   if (!def) return null
-  const inX = (v: number) => clamp(snap(v), -size.w / 2, size.w / 2)
-  const inZ = (v: number) => clamp(snap(v), -size.d / 2, size.d / 2)
+
+  // 중심이 아니라 물건 전체가 벽 안에 들어오게: 반쪽 크기만큼 안쪽으로 막음
+  const [fw, fd] = def.footprint
+  const quarter = ((Math.round((options.rot ?? 0) / 90) % 4) + 4) % 4
+  const [halfX, halfZ] = quarter % 2 === 1 ? [fd / 2, fw / 2] : [fw / 2, fd / 2]
+  const keepIn = (v: number, half: number, room: number) => {
+    const limit = Math.max(0, room / 2 - half)
+    // 스냅하면 0.05 단위로 벽을 살짝 넘을 수 있어서, 막는 건 스냅 뒤에
+    return Number(clamp(snap(v), -limit, limit).toFixed(2))
+  }
+  const inX = (v: number, half = halfX) => keepIn(v, half, size.w)
+  const inZ = (v: number, half = halfZ) => keepIn(v, half, size.d)
 
   if (def.place === 'wall') {
     const hit = wallHit(ray, size)
     if (!hit) return null
     const y = clamp(snap(hit.point.y), 0.1, size.h - 0.1)
     // 벽에 붙는 축은 스냅하지 않고 벽 위치 그대로
+    // 벽 물건은 폭(fw)이 벽을 따라 놓임
     return hit.rot === 0
-      ? { x: inX(hit.point.x), y, z: hit.point.z, rot: 0 }
-      : { x: hit.point.x, y, z: inZ(hit.point.z), rot: hit.rot }
+      ? { x: inX(hit.point.x, fw / 2), y, z: hit.point.z, rot: 0 }
+      : { x: hit.point.x, y, z: inZ(hit.point.z, fw / 2), rot: hit.rot }
   }
 
   if (def.place === 'surface') {
@@ -147,4 +158,59 @@ export function ridersOf(layout: LayoutData, base: PlacedItem) {
     if (Math.abs(it.y - (base.y + top)) > 0.03) return false
     return it.x >= box.minX && it.x <= box.maxX && it.z >= box.minZ && it.z <= box.maxZ
   })
+}
+
+/** 바닥 가구 중심을 방 안으로 밀어넣은 위치 (돌렸더니 벽을 뚫을 때) */
+export function keepInside(placed: PlacedItem, size: RoomSize) {
+  const def = CATALOG[placed.item]
+  if (!def || def.place !== 'floor') return { x: placed.x, z: placed.z }
+  const box = footprintBox(placed)
+  const halfX = (box.maxX - box.minX) / 2
+  const halfZ = (box.maxZ - box.minZ) / 2
+  const fit = (v: number, half: number, room: number) => {
+    const limit = Math.max(0, room / 2 - half)
+    return Number(clamp(v, -limit, limit).toFixed(2))
+  }
+  return { x: fit(placed.x, halfX, size.w), z: fit(placed.z, halfZ, size.d) }
+}
+
+const isSolid = (placed: PlacedItem) => {
+  const def = CATALOG[placed.item]
+  return def?.place === 'floor' && !def.flat
+}
+
+/** 이 자리에 두면 다른 바닥 가구랑 겹치는지 (러그 같은 납작한 건 상관없음) */
+export function isBlocked(layout: LayoutData, moving: PlacedItem, ignore: Set<string> = new Set()) {
+  if (!isSolid(moving)) return false
+  const a = footprintBox(moving)
+  const EPS = 0.02
+  return layout.items.some((other) => {
+    if (other.id === moving.id || ignore.has(other.id) || !isSolid(other)) return false
+    const b = footprintBox(other)
+    const ox = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX)
+    const oz = Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ)
+    return ox > EPS && oz > EPS
+  })
+}
+
+/**
+ * 지금 자리에서 목표 자리까지 조금씩 옮기면서, 다른 가구에 막히면 거기서 멈춤.
+ * x·z를 따로 시도해서 막힌 쪽만 멈추고 나머지 방향으론 벽 타듯 미끄러짐.
+ * 한 번에 건너뛰지 않으니까 가구를 뚫고 반대편으로 순간이동하지 않음
+ */
+export function slideTo(layout: LayoutData, current: PlacedItem, target: { x: number; z: number }) {
+  // 이미 겹친 채로 시작했으면 막지 않음 (안 그러면 못 빼냄)
+  if (isBlocked(layout, current)) return target
+  let { x, z } = current
+  const steps = Math.ceil(Math.max(Math.abs(target.x - x), Math.abs(target.z - z)) / SNAP)
+  if (steps === 0) return target
+  const sx = (target.x - x) / steps
+  const sz = (target.z - z) / steps
+  for (let i = 0; i < steps; i++) {
+    const nx = x + sx
+    if (!isBlocked(layout, { ...current, x: nx, z })) x = nx
+    const nz = z + sz
+    if (!isBlocked(layout, { ...current, x, z: nz })) z = nz
+  }
+  return { x: Number(snap(x).toFixed(2)), z: Number(snap(z).toFixed(2)) }
 }
