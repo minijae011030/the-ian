@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { canvasTexture } from '../../lib/canvasTexture'
+import { canvasTexture } from '../lib/canvasTexture'
 
 /**
- * 방 꾸미기용 가구 키트. 전부 바닥(y=0) 기준, 기본 방향은 앞면이 +z.
+ * 아이템을 만드는 부품들 (도형 조합 가구). 전부 바닥(y=0) 기준, 기본 방향은 앞면이 +z.
  * 크기 단위는 대충 1 = 1.3m (천장이 1.78)
  */
 export const WOOD = '#b98b5e'

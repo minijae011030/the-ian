@@ -8,10 +8,9 @@ import { BUILDING, ROOM_DEPTH } from '../building/config'
 import { currentActivity, isLightOn, ROOM_BY_ID, roomGeometry } from '../building/rooms'
 import { Character } from '../character/Character'
 import { environment } from '../environment'
-import { layoutFor } from './layouts'
+import { CATALOG } from '../../items/catalog'
+import { findSpot, isVisible, useLayout } from './layoutData'
 import type { RoomSize } from './types'
-
-const WALL = '#efe9df'
 
 function useFloorTexture() {
   return useMemo(
@@ -35,7 +34,7 @@ function useFloorTexture() {
 }
 
 /** 벽·바닥·천장·조명. 원점 = 바닥 한가운데 */
-function RoomShell({ size: { w, d, h }, lightOn }: { size: RoomSize; lightOn: boolean }) {
+function RoomShell({ size: { w, d, h }, lightOn, wall }: { size: RoomSize; lightOn: boolean; wall: string }) {
   const floorTexture = useFloorTexture()
   const ceilingLight = useRef<PointLight>(null)
   const ceilingDisc = useRef<MeshBasicMaterial>(null)
@@ -57,12 +56,12 @@ function RoomShell({ size: { w, d, h }, lightOn }: { size: RoomSize; lightOn: bo
       </mesh>
       <mesh position={[0, h / 2, -d / 2]}>
         <planeGeometry args={[w, h]} />
-        <meshStandardMaterial color={WALL} />
+        <meshStandardMaterial color={wall} />
       </mesh>
       {[-1, 1].map((side) => (
         <mesh key={side} position={[(side * w) / 2, h / 2, 0]} rotation-y={(-side * Math.PI) / 2}>
           <planeGeometry args={[d, h]} />
-          <meshStandardMaterial color={WALL} />
+          <meshStandardMaterial color={wall} />
         </mesh>
       ))}
 
@@ -78,36 +77,48 @@ function RoomShell({ size: { w, d, h }, lightOn }: { size: RoomSize; lightOn: bo
 }
 
 /**
- * 들여다보는 방. 방 레이아웃(가구)과 지금 하는 일에 맞는 자리에 캐릭터를 둠.
+ * 들여다보는 방. 배치 데이터(JSON)대로 아이템을 놓고, 지금 하는 일을 할 수 있는 가구 자리에 캐릭터를 둠.
  * 방 원점 = 방 가운데 창 중심 → 안쪽 그룹에서 바닥 한가운데로 옮김
  */
 export function RoomView() {
   const focused = useFocused()
   const room = focused ? ROOM_BY_ID.get(focused) : undefined
-  const [kind, setKind] = useState<ActivityKind>('rest')
+  return room ? <FocusedRoom key={room.id} roomId={room.id} /> : null
+}
+
+function FocusedRoom({ roomId }: { roomId: string }) {
+  const room = ROOM_BY_ID.get(roomId)!
+  const [kind, setKind] = useState<ActivityKind>(() => currentActivity(room, environment.hour).kind)
 
   // 일과가 바뀌면(1분 단위) 다시 그림
   useFrame(() => {
-    if (!room) return
     const next = currentActivity(room, environment.hour).kind
     if (next !== kind) setKind(next)
   })
-
-  if (!room) return null
 
   const { interiorCenter, rotationY, interiorWidth } = roomGeometry(room)
   // 위아래 슬래브 두께만큼 빼고, 바닥·천장을 슬래브 면에서 살짝 띄움 (z-fighting 방지)
   const h = BUILDING.floorHeight - 0.22 - 0.024
   const size: RoomSize = { w: interiorWidth, d: ROOM_DEPTH, h }
-  const layout = layoutFor(room.id)
-  const spot = layout.spots(size)[kind]
+  const layout = useLayout(room.id, size)
   const lightOn = isLightOn({ from: '', to: '', label: '', kind })
+  const spot = layout ? findSpot(layout, kind) : null
 
   return (
     <group position={interiorCenter} rotation-y={rotationY}>
       <group position={[0, -h / 2, -ROOM_DEPTH / 2 - 0.02]}>
-        <RoomShell size={size} lightOn={lightOn} />
-        <layout.Furniture size={size} kind={kind} />
+        <RoomShell size={size} lightOn={lightOn} wall={layout?.wall ?? '#efe9df'} />
+        {layout?.items
+          .filter((placed) => isVisible(placed, kind))
+          .map((placed) => {
+            const def = CATALOG[placed.item]
+            if (!def) return null
+            return (
+              <group key={placed.id} position={[placed.x, placed.y, placed.z]} rotation-y={(placed.rot * Math.PI) / 180}>
+                {def.render({ variant: placed.variant ?? def.variants[0], lit: lightOn })}
+              </group>
+            )
+          })}
         {spot && (
           <group position={spot.position} rotation-y={spot.rotationY}>
             <Character pose={spot.pose} hands={spot.hands} prop={spot.prop} seat={spot.seat} />

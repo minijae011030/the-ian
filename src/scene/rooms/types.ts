@@ -8,9 +8,9 @@ export type RoomSize = { w: number; d: number; h: number }
 
 export type Pose = 'stand' | 'sit' | 'lie'
 export type Hands = 'down' | 'type' | 'write' | 'phone' | 'eat' | 'face' | 'read' | 'pet'
-export type Prop = 'bowl' | 'phone' | 'book' | null
+export type Prop = 'phone' | 'book' | null
 
-/** 캐릭터가 그 일을 할 때 서 있을 자리 */
+/** 캐릭터가 그 일을 할 때 있을 자리 (방 좌표) */
 export type Spot = {
   pose: Pose
   hands: Hands
@@ -22,8 +22,30 @@ export type Spot = {
   prop?: Prop
 }
 
-export type RoomLayout = {
-  Furniture: (props: { size: RoomSize; kind: ActivityKind }) => React.ReactNode
-  /** 일 종류별 자리. null이면 캐릭터 없음 (외출) */
-  spots: (size: RoomSize) => Partial<Record<ActivityKind, Spot | null>>
+/**
+ * 방 배치 데이터 = public/data/layouts/<방id>.json
+ * 에디터가 이 파일을 GitHub에 커밋하고, 뷰어는 fetch해서 그림
+ */
+export type LayoutData = {
+  version: 1
+  /** 벽 색 */
+  wall: string
+  /** 바닥 종류 (items/surfaces.ts) */
+  floor: string
+  items: PlacedItem[]
+}
+
+export type PlacedItem = {
+  /** 배치 안에서 고유한 이름 (에디터에서 고를 때 씀) */
+  id: string
+  /** 카탈로그 아이템 id (items/catalog.tsx) */
+  item: string
+  x: number
+  y: number
+  z: number
+  /** 도 단위, 90 단위 권장 */
+  rot: number
+  variant?: string
+  /** 이 일을 할 때만 보임 (예: 밥그릇은 eat일 때만) */
+  when?: ActivityKind[]
 }

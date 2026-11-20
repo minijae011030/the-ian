@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "wall": "#efe9df",
+  "floor": "wood",
+  "items": [
+    { "id": "bed", "item": "bed", "x": -1.16, "y": 0, "z": -0.55, "rot": 0, "variant": "lilac" },
+    { "id": "desk", "item": "desk", "x": 1.41, "y": 0, "z": 0.15, "rot": 90, "variant": "long" },
+    { "id": "chair", "item": "chair", "x": 0.86, "y": 0, "z": 0.15, "rot": 90, "variant": "charcoal" },
+    { "id": "laptop", "item": "laptop", "x": 1.39, "y": 0.74, "z": 0.2, "rot": 90, "variant": "cover-letter" },
+    { "id": "lamp", "item": "desk-lamp", "x": 1.53, "y": 0.74, "z": -0.35, "rot": 0 },
+    { "id": "books", "item": "books", "x": 1.46, "y": 0.74, "z": 0.63, "rot": 90, "variant": "job" },
+    { "id": "bowl", "item": "bowl", "x": 1.29, "y": 0.74, "z": -0.1, "rot": 0, "when": ["eat"] },
+    { "id": "rack", "item": "clothes-rack", "x": 1.21, "y": 0, "z": -1.3, "rot": 0, "variant": "suits" },
+    { "id": "vanity", "item": "vanity", "x": -1.51, "y": 0, "z": 1.05, "rot": 90 },
+    { "id": "plant", "item": "plant", "x": 1.46, "y": 0, "z": 1.3, "rot": 0 },
+    { "id": "rug", "item": "rug", "x": -0.1, "y": 0, "z": 0.35, "rot": 0, "variant": "sand" },
+    { "id": "calendar", "item": "calendar", "x": -0.05, "y": 1.09, "z": -1.59, "rot": 0 },
+    { "id": "postits", "item": "postit-board", "x": 0.6, "y": 1.05, "z": -1.59, "rot": 0 }
+  ]
+}
