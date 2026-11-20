@@ -1,12 +1,12 @@
 import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { type Group, InstancedMesh, Object3D, type Points, Vector3 } from 'three'
+import { type Group, InstancedMesh, Object3D, Vector3 } from 'three'
 import type { ActivityKind } from '../../data/rooms'
 import type { RoomSize } from '../rooms/types'
 import { RabbitBody, type RabbitFur } from './RabbitBody'
 
 /**
- * 방에 사는 토끼·달팽이 캐릭터. 원점 = 방 바닥 한가운데 (RoomView와 같은 좌표).
+ * 방에 사는 토끼 캐릭터. 원점 = 방 바닥 한가운데 (RoomView와 같은 좌표).
  * 사람처럼 가구 자리를 찾지 않고 방 안을 알아서 돌아다님
  */
 
@@ -334,129 +334,5 @@ export function RabbitCharacter({
         <meshStandardMaterial color="#4a3426" roughness={1} />
       </instancedMesh>
     </>
-  )
-}
-
-/* ───────── 달팽이 ───────── */
-
-const TRAIL = 80
-
-/**
- * 명주달팽이. 천장에 거꾸로 붙어서 아주 천천히 기어다님 (가끔 벽 위쪽).
- * 지나간 자리엔 반짝이는 점액 자국. 잘 때는 껍데기 속으로 쏙
- */
-export function SnailCharacter({
-  kind,
-  size,
-  onCeiling = true,
-}: {
-  kind: ActivityKind
-  size: RoomSize
-  onCeiling?: boolean
-}) {
-  const root = useRef<Group>(null)
-  const bodyRef = useRef<Group>(null)
-  const trailRef = useRef<Points>(null)
-  const bounds = { x: size.w / 2 - 0.2, z: size.d / 2 - 0.2 }
-  const state = useRef({
-    pos: new Vector3(rand(-bounds.x, bounds.x) * 0.5, 0, rand(-bounds.z, bounds.z) * 0.5),
-    target: new Vector3(),
-    yaw: 0,
-    retarget: 0,
-    lastTrail: 0,
-    trail: [] as Vector3[],
-  })
-  const trailPositions = useMemo(() => new Float32Array(TRAIL * 3), [])
-
-  useFrame(({ clock }, delta) => {
-    const t = clock.elapsedTime
-    const s = state.current
-    const sleeping = kind === 'sleep'
-    const dt = Math.min(delta, 0.1)
-
-    if (t > s.retarget) {
-      s.retarget = t + rand(20, 45)
-      s.target.set(rand(-bounds.x, bounds.x), 0, rand(-bounds.z, bounds.z))
-    }
-    if (!sleeping) {
-      const to = s.target.clone().sub(s.pos)
-      if (to.length() > 0.02) {
-        // 방향을 아주 천천히 틂
-        const want = Math.atan2(to.x, to.z)
-        let diff = want - s.yaw
-        diff = Math.atan2(Math.sin(diff), Math.cos(diff))
-        s.yaw += diff * dt * 0.4
-        s.pos.x += Math.sin(s.yaw) * dt * 0.018
-        s.pos.z += Math.cos(s.yaw) * dt * 0.018
-      }
-      if (t - s.lastTrail > 1.2) {
-        s.lastTrail = t
-        s.trail.push(s.pos.clone())
-        if (s.trail.length > TRAIL) s.trail.shift()
-        s.trail.forEach((p, i) => trailPositions.set([p.x, 0, p.z], i * 3))
-        const geo = trailRef.current?.geometry
-        if (geo) {
-          geo.attributes.position.needsUpdate = true
-          geo.setDrawRange(0, s.trail.length)
-        }
-      }
-    }
-
-    root.current?.position.set(s.pos.x, 0, s.pos.z)
-    root.current?.rotation.set(0, s.yaw, 0)
-    if (bodyRef.current) {
-      // 자면 몸을 껍데기 속으로 집어넣음, 깨어 있으면 꿈틀꿈틀
-      const out = sleeping ? 0.05 : 1
-      const cur = bodyRef.current.scale.x
-      const next = cur + (out - cur) * Math.min(1, dt * 1.5)
-      bodyRef.current.scale.set(next, next, next * (1 + Math.sin(t * 1.3) * 0.04))
-    }
-  })
-
-  // 천장이면 거꾸로 매달림 (y = 천장 높이, 위아래 뒤집기)
-  return (
-    <group
-      position-y={onCeiling ? size.h - 0.005 : 0}
-      rotation-x={onCeiling ? Math.PI : 0}
-      scale={[1, 1, onCeiling ? -1 : 1]}
-    >
-      <points ref={trailRef}>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[trailPositions, 3]} />
-        </bufferGeometry>
-        <pointsMaterial color="#cfe6ff" size={0.02} transparent opacity={0.45} depthWrite={false} />
-      </points>
-      <group ref={root}>
-        <group scale={3.6}>
-          <group ref={bodyRef}>
-            <mesh position={[0, 0.008, 0.008]} scale={[0.014, 0.008, 0.034]}>
-              <sphereGeometry args={[1, 12, 8]} />
-              <meshStandardMaterial color="#c9bba3" roughness={0.4} />
-            </mesh>
-            {[-1, 1].map((sx) => (
-              <group key={sx} position={[sx * 0.004, 0.012, 0.038]} rotation={[0.7, 0, sx * 0.3]}>
-                <mesh position-y={0.008}>
-                  <cylinderGeometry args={[0.0012, 0.0015, 0.016, 5]} />
-                  <meshStandardMaterial color="#b5a68e" />
-                </mesh>
-                <mesh position-y={0.016}>
-                  <sphereGeometry args={[0.002, 6, 4]} />
-                  <meshStandardMaterial color="#3a3226" />
-                </mesh>
-              </group>
-            ))}
-          </group>
-          {/* 연갈색 반투명 껍데기 */}
-          <mesh position={[0, 0.02, -0.004]} rotation-y={Math.PI / 2}>
-            <torusGeometry args={[0.011, 0.008, 10, 20]} />
-            <meshPhysicalMaterial color="#d8b77a" transmission={0.3} roughness={0.3} thickness={0.01} />
-          </mesh>
-          <mesh position={[0, 0.021, -0.004]}>
-            <sphereGeometry args={[0.009, 10, 8]} />
-            <meshPhysicalMaterial color="#c9a465" roughness={0.3} />
-          </mesh>
-        </group>
-      </group>
-    </group>
   )
 }

@@ -57,6 +57,7 @@ export const WALLS: { color: string; name: string }[] = [
   { color: '#c9b98a', name: '누런 벽지' },
   { color: '#7d7f82', name: '시멘트 벽' },
   { color: '#5a2a2e', name: '검붉은 벽지' },
+  { color: '#dfe7ea', name: '투명 사육통' },
 ]
 
 export const ENTRIES: Entry[] = [

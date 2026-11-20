@@ -134,6 +134,20 @@ export const ROOMS: Room[] = [
     ],
   },
   {
+    id: 'snail',
+    name: '달팽이방',
+    face: 'front',
+    floor: 4,
+    bay: 4,
+    bays: 2,
+    // 달팽이는 밤에 돌아다님. 낮엔 집 문간에 껍데기 박고 잠
+    schedule: [
+      { from: '07:00', to: '18:00', kind: 'sleep', label: '달팽이 집에서 자는 중' },
+      { from: '18:00', to: '19:30', kind: 'eat', label: '애호박 갉아먹는 중' },
+      { from: '19:30', to: '07:00', kind: 'rest', label: '천장 산책 중' },
+    ],
+  },
+  {
     id: 'reading',
     name: '독서방',
     face: 'back',

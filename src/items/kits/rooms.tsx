@@ -316,61 +316,6 @@ export function CheckMat({ size = [1.6, 1.2] as [number, number] }: { size?: [nu
 
 /* ───── 달팽이 ───── */
 
-/**
- * 달팽이 사육통: 투명 플라스틱 통 + 흙 + 놀이목 + 상추 + 명주달팽이.
- * 명주달팽이: 작고 얇은 연갈색 반투명 껍데기. 놀이목 위를 아주 천천히 오르내림
- */
-export function SnailCage() {
-  const snail = useRef<Group>(null)
-  useFrame(({ clock }) => {
-    if (!snail.current) return
-    const t = (Math.sin(clock.elapsedTime * 0.08) + 1) / 2 // 0..1 아주 느리게
-    snail.current.position.set(-0.08 + t * 0.12, 0.075 + t * 0.07, 0.01)
-  })
-  return (
-    <group>
-      {/* 흙 */}
-      <Box size={[0.34, 0.06, 0.2]} position={[0, 0.03, 0]} color="#4a3524" />
-      {/* 놀이목: 비스듬히 누운 나뭇가지 */}
-      <mesh position={[-0.02, 0.1, 0]} rotation-z={0.55}>
-        <cylinderGeometry args={[0.014, 0.018, 0.26, 7]} />
-        <meshStandardMaterial color="#8a6a4a" roughness={1} />
-      </mesh>
-      {/* 상추 */}
-      <mesh position={[0.11, 0.065, 0.03]} rotation={[-1.4, 0, 0.3]} scale={[0.06, 0.045, 1]}>
-        <circleGeometry args={[1, 10]} />
-        <meshStandardMaterial color="#7fbf5a" side={2} />
-      </mesh>
-      {/* 명주달팽이 */}
-      <group ref={snail} rotation-z={0.55}>
-        <mesh position={[0, 0.006, 0]} scale={[0.028, 0.008, 0.01]}>
-          <sphereGeometry args={[1, 10, 6]} />
-          <meshStandardMaterial color="#c9bba3" />
-        </mesh>
-        {[-1, 1].map((s) => (
-          <mesh key={s} position={[0.028, 0.016, s * 0.004]} rotation-z={-0.6}>
-            <cylinderGeometry args={[0.0015, 0.0015, 0.014, 4]} />
-            <meshStandardMaterial color="#b5a68e" />
-          </mesh>
-        ))}
-        <mesh position={[-0.004, 0.02, 0]} rotation-x={Math.PI / 2}>
-          <torusGeometry args={[0.011, 0.007, 8, 16]} />
-          <meshPhysicalMaterial color="#d8b77a" transmission={0.35} roughness={0.35} thickness={0.01} />
-        </mesh>
-      </group>
-      {/* 투명 플라스틱 통 + 숨구멍 뚫린 뚜껑 */}
-      <mesh position-y={0.11}>
-        <boxGeometry args={[0.36, 0.22, 0.22]} />
-        <meshPhysicalMaterial color="#e8f2ff" transparent opacity={0.18} roughness={0.1} depthWrite={false} />
-      </mesh>
-      <Box size={[0.37, 0.02, 0.23]} position={[0, 0.23, 0]} color="#f2f2f2" />
-      {[-0.1, -0.04, 0.02, 0.08].map((x) => (
-        <Box key={x} size={[0.015, 0.003, 0.015]} position={[x, 0.241, 0]} color="#9aa0a8" />
-      ))}
-    </group>
-  )
-}
-
 /* ───── 빵집방 ───── */
 
 export function Oven({ lit }: { lit: boolean }) {

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "wall": "#dfe7ea",
+  "floor": "soil",
+  "character": {"kind":"snail"},
+  "items": [
+    {"id":"felt","item":"pink-felt","x":-0.95,"y":0,"z":0.55,"rot":0},
+    {"id":"house","item":"snail-house","x":-1.0,"y":0,"z":-0.85,"rot":0},
+    {"id":"arch","item":"tube-arch","x":0.25,"y":0,"z":-1.2,"rot":0},
+    {"id":"calcium","item":"calcium-bowl","x":0.2,"y":0,"z":0.5,"rot":0},
+    {"id":"zucchini","item":"zucchini","x":1.15,"y":0,"z":0.1,"rot":0},
+    {"id":"plant-1","item":"fake-plant","x":1.35,"y":0,"z":-1.2,"rot":0},
+    {"id":"plant-2","item":"fake-plant","x":1.4,"y":0,"z":1.15,"rot":40}
+  ]
+}

@@ -4,7 +4,7 @@ import { Box3, type Group, type OrthographicCamera, Vector3 } from 'three'
 import { FLOORS } from '../items/floors'
 import { Rabbit } from '../items/kits/rooms'
 import { Character } from '../scene/character/Character'
-import { SnailCharacter } from '../scene/character/Pets'
+import { SnailCharacter } from '../scene/character/Snail'
 import { PlacedItemMesh } from '../scene/rooms/PlacedItems'
 import { DEFAULT_CHARACTER } from '../scene/rooms/types'
 import { type CharacterEntry, ENTRIES, type ObjectEntry } from './entries'
@@ -102,7 +102,7 @@ function Shot({ entry, onShot }: { entry: Shootable; onShot: (key: string, url: 
 function CharacterThumb({ entry }: { entry: CharacterEntry }) {
   const config = { ...DEFAULT_CHARACTER, ...entry.patch }
   if (config.kind === 'rabbit') return <Rabbit fur={config.fur} />
-  if (config.kind === 'snail') return <SnailCharacter kind="rest" size={{ w: 0.4, d: 0.4, h: 1 }} onCeiling={false} />
+  if (config.kind === 'snail') return <SnailCharacter kind="rest" size={{ w: 1, d: 1, h: 1 }} preview />
   return <Character pose="stand" hands="down" look={config} />
 }
 

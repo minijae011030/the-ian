@@ -62,6 +62,31 @@ export const FLOORS: Record<string, { name: string; draw: (ctx: CanvasRenderingC
       ctx.stroke()
     },
   },
+  soil: {
+    name: '코코피트 흙',
+    draw: (ctx) => {
+      ctx.fillStyle = '#3b271b'
+      ctx.fillRect(0, 0, 128, 128)
+      // 알갱이
+      for (let i = 0; i < 1600; i++) {
+        const v = Math.random()
+        ctx.fillStyle = v < 0.5 ? 'rgba(20,12,8,0.5)' : v < 0.85 ? 'rgba(92,62,40,0.5)' : 'rgba(140,100,64,0.45)'
+        ctx.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 2, 1 + Math.random() * 2)
+      }
+      // 코코넛 섬유
+      ctx.strokeStyle = 'rgba(150,110,70,0.55)'
+      ctx.lineWidth = 0.8
+      for (let i = 0; i < 26; i++) {
+        const x = Math.random() * 128
+        const y = Math.random() * 128
+        const a = Math.random() * Math.PI
+        ctx.beginPath()
+        ctx.moveTo(x, y)
+        ctx.lineTo(x + Math.cos(a) * 14, y + Math.sin(a) * 14)
+        ctx.stroke()
+      }
+    },
+  },
 }
 
 const cache = new Map<string, ReturnType<typeof canvasTexture>>()

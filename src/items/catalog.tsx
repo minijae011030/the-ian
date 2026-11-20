@@ -17,6 +17,7 @@ import {
 } from './parts'
 import * as Home from './kits/home'
 import * as Kit from './kits/rooms'
+import * as Snail from './kits/snail'
 
 /** 아이템이 캐릭터에게 주는 자리. at·facing은 아이템 기준 (facing은 도) */
 export type ItemUse = Omit<Spot, 'position' | 'rotationY'> & {
@@ -367,13 +368,56 @@ export const CATALOG: Record<string, ItemDef> = {
     variants: ['default'],
     render: () => <Kit.CheckMat />,
   },
-  'snail-cage': {
-    name: '달팽이 사육통',
-    category: 'small',
-    place: 'surface',
-    footprint: [0.37, 0.23],
+
+  /* ───── 달팽이방 (사육통 속) ───── */
+  'snail-house': {
+    name: '달팽이 집',
+    category: 'furniture',
+    place: 'floor',
+    footprint: [1.0, 0.8],
     variants: ['default'],
-    render: () => <Kit.SnailCage />,
+    render: () => <Snail.SnailHouse />,
+  },
+  'tube-arch': {
+    name: '튜브 놀이터',
+    category: 'furniture',
+    place: 'floor',
+    footprint: [0.82, 0.4],
+    variants: ['default'],
+    render: () => <Snail.TubeArch />,
+  },
+  'calcium-bowl': {
+    name: '칼슘 그릇',
+    category: 'decor',
+    place: 'floor',
+    footprint: [0.8, 0.8],
+    variants: ['default'],
+    render: () => <Snail.CalciumBowl />,
+  },
+  zucchini: {
+    name: '애호박',
+    category: 'decor',
+    place: 'floor',
+    footprint: [0.72, 0.72],
+    variants: ['default'],
+    render: () => <Snail.ZucchiniSlice />,
+  },
+  'fake-plant': {
+    name: '조화',
+    category: 'decor',
+    place: 'floor',
+    footprint: [0.5, 0.5],
+    variants: ['default'],
+    render: () => <Snail.FakePlant />,
+  },
+  'pink-felt': {
+    name: '분홍 펠트',
+    category: 'decor',
+    place: 'floor',
+    footprint: [1.3, 1.0],
+    flat: true,
+    variants: ['default'],
+    render: () => <Snail.PinkFelt />,
   },
 
   /* ───── 빵집방 ───── */
