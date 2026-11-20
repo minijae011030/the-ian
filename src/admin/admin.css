@@ -39,7 +39,6 @@ input {
   background: #15171d;
 }
 
-.topbar select,
 .topbar input {
   height: 30px;
   border: 1px solid #2f333d;
@@ -48,18 +47,86 @@ input {
   background: #0d0f14;
 }
 
-.room-picker select {
-  min-width: 140px;
+/* ── 드롭다운 ── */
+.dropdown {
+  position: relative;
+}
+
+.dd-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  border: 1px solid #2f333d;
+  border-radius: 3px;
+  padding: 0 10px;
+  background: #0d0f14;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dd-button.bold {
   font-weight: 700;
+}
+
+.dd-button svg {
+  flex: none;
+  color: #8b909c;
+}
+
+.dd-list {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  z-index: 40;
+  min-width: 100%;
+  padding: 4px;
+  border: 1px solid #2f333d;
+  border-radius: 3px;
+  background: #15171d;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  list-style: none;
+}
+
+.dd-list button {
+  width: 100%;
+  border: 0;
+  border-radius: 2px;
+  padding: 7px 10px;
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dd-list button:hover {
+  background: #252933;
+}
+
+.dd-list button.active {
+  color: #8ab4ff;
+  font-weight: 700;
+}
+
+/* 시점 돌리기 아이콘 버튼 */
+.tools > button.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  padding: 0;
 }
 
 .tools {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
   margin: 0 auto;
 }
 
-.tools button,
+.tools > button,
 .gear {
   height: 30px;
   min-width: 30px;
@@ -70,7 +137,7 @@ input {
   cursor: pointer;
 }
 
-.tools button:hover,
+.tools > button:hover,
 .gear:hover {
   background: #252933;
 }
@@ -175,7 +242,8 @@ input {
   background: #252933;
 }
 
-.actionbar span {
+.actionbar span,
+.actionbar svg {
   color: #8ab4ff;
 }
 

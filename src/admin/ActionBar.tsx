@@ -1,6 +1,7 @@
 import { Html } from '@react-three/drei'
 import { CATALOG } from '../items/catalog'
 import type { PlacedItem } from '../scene/rooms/types'
+import { RotateIcon } from './icons'
 
 /** 선택한 물건 위에 뜨는 작은 바: 방향 · 빼기 */
 export function ActionBar({
@@ -18,7 +19,8 @@ export function ActionBar({
       <div className="actionbar" onPointerDown={(e) => e.stopPropagation()}>
         {!onWall && (
           <button onClick={onTurn}>
-            <span>⟳</span>방향
+            <RotateIcon />
+            방향
           </button>
         )}
         <button className="out" onClick={onRemove}>

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ActivityKind, ROOMS } from '../data/rooms'
 import { defaultLayout, fetchLayout, roomSize } from '../scene/rooms/layoutData'
 import type { LayoutData, PlacedItem } from '../scene/rooms/types'
+import { Dropdown } from './Dropdown'
+import { RotateIcon } from './icons'
 import { EditorScene } from './EditorScene'
 import { type Entry, ENTRIES, type Tab, TABS } from './entries'
 import { commitFiles, type GithubSettings, loadSettings, readFile, saveSettings } from './github'
@@ -204,35 +206,32 @@ export function AdminApp() {
   return (
     <div className="admin">
       <header className="topbar">
-        <div className="room-picker">
-          <select
-            value={roomId}
-            onChange={(e) => {
-              setRoomId(e.target.value)
-              setSelectedId(null)
-              setPlacing(null)
-            }}
-          >
-            {ROOMS.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-                {dirtyIds.includes(r.id) ? ' •' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Dropdown
+          bold
+          width={150}
+          value={roomId}
+          options={ROOMS.map((r) => ({ value: r.id, label: `${r.name}${dirtyIds.includes(r.id) ? ' •' : ''}` }))}
+          onChange={(id) => {
+            setRoomId(id)
+            setSelectedId(null)
+            setPlacing(null)
+          }}
+        />
 
         <div className="tools">
-          <button onClick={() => setView((v) => (v + 3) % 4)}>⟲</button>
-          <button onClick={() => setView((v) => (v + 1) % 4)}>⟳</button>
+          <button className="icon" title="시점 왼쪽으로" onClick={() => setView((v) => (v + 3) % 4)}>
+            <RotateIcon flip />
+          </button>
+          <button className="icon" title="시점 오른쪽으로" onClick={() => setView((v) => (v + 1) % 4)}>
+            <RotateIcon />
+          </button>
           <button onClick={undo}>되돌리기</button>
-          <select value={previewKind} onChange={(e) => setPreviewKind(e.target.value as ActivityKind)}>
-            {KINDS.map((k) => (
-              <option key={k.kind} value={k.kind}>
-                {k.label}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            width={110}
+            value={previewKind}
+            options={KINDS.map((k) => ({ value: k.kind, label: k.label }))}
+            onChange={setPreviewKind}
+          />
         </div>
 
         <div className="save-area">
