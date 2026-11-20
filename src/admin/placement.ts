@@ -198,9 +198,12 @@ export function isBlocked(layout: LayoutData, moving: PlacedItem, ignore: Set<st
  * x·z를 따로 시도해서 막힌 쪽만 멈추고 나머지 방향으론 벽 타듯 미끄러짐.
  * 한 번에 건너뛰지 않으니까 가구를 뚫고 반대편으로 순간이동하지 않음
  */
-export function slideTo(layout: LayoutData, current: PlacedItem, target: { x: number; z: number }) {
-  // 이미 겹친 채로 시작했으면 막지 않음 (안 그러면 못 빼냄)
-  if (isBlocked(layout, current)) return target
+export function slideTo(
+  layout: LayoutData,
+  current: PlacedItem,
+  target: { x: number; z: number },
+  ignore: Set<string> = new Set(),
+) {
   let { x, z } = current
   const steps = Math.ceil(Math.max(Math.abs(target.x - x), Math.abs(target.z - z)) / SNAP)
   if (steps === 0) return target
@@ -208,9 +211,16 @@ export function slideTo(layout: LayoutData, current: PlacedItem, target: { x: nu
   const sz = (target.z - z) / steps
   for (let i = 0; i < steps; i++) {
     const nx = x + sx
-    if (!isBlocked(layout, { ...current, x: nx, z })) x = nx
+    if (!isBlocked(layout, { ...current, x: nx, z }, ignore)) x = nx
     const nz = z + sz
-    if (!isBlocked(layout, { ...current, x, z: nz })) z = nz
+    if (!isBlocked(layout, { ...current, x, z: nz }, ignore)) z = nz
   }
   return { x: Number(snap(x).toFixed(2)), z: Number(snap(z).toFixed(2)) }
+}
+
+/** 이 가구랑 이미 겹쳐 있는 가구들 (끌기 시작할 때 이미 겹친 건 막지 않아야 빼낼 수 있음) */
+export function overlappingWith(layout: LayoutData, item: PlacedItem) {
+  return new Set(
+    layout.items.filter((other) => other.id !== item.id && isBlocked({ ...layout, items: [other] }, item)).map((o) => o.id),
+  )
 }

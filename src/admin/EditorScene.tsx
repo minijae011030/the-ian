@@ -1,7 +1,7 @@
 import { Grid, OrbitControls, useHelper } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BoxHelper, type Group, Plane, Vector2, Vector3 } from 'three'
+import { BoxHelper, type Group, Plane, Raycaster, Vector2, Vector3 } from 'three'
 import type { ActivityKind } from '../data/rooms'
 import { CATALOG } from '../items/catalog'
 import { Character } from '../scene/character/Character'
@@ -10,7 +10,7 @@ import { PlacedItemMesh } from '../scene/rooms/PlacedItems'
 import { RoomShell } from '../scene/rooms/RoomShell'
 import type { LayoutData, PlacedItem, RoomSize } from '../scene/rooms/types'
 import { ActionBar } from './ActionBar'
-import { findOverlaps, isBlocked, type Placement, placeAt, ridersOf, slideTo } from './placement'
+import { findOverlaps, isBlocked, overlappingWith, type Placement, placeAt, ridersOf, slideTo } from './placement'
 
 /** 내려다보는 각도 (카메라 높이 8, 수평거리 10) */
 const POLAR = Math.atan2(10, 8)
@@ -80,7 +80,14 @@ function Scene({
     item: PlacedItem
     offset?: Vector3
     riders: { id: string; dx: number; dz: number }[]
+    /** 마지막으로 옮긴 자리. 화면 갱신(React 렌더)이 한 박자 늦어도 이 값 기준으로 이어서 움직임 */
+    pos: { x: number; y: number; z: number }
+    /** 끌기 시작할 때 이미 겹쳐 있던 가구 → 막지 않음 */
+    ignore: Set<string>
   } | null>(null)
+  // useFrame 안에서 항상 최신 배치를 보게 (안 그러면 지난 화면의 배치로 계산해서 왔다갔다 함)
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
   const [ghost, setGhost] = useState<Placement | null>(null)
   const ghostRef = useRef<Placement | null>(null)
   const overlaps = useMemo(() => findOverlaps(layout), [layout])
@@ -102,6 +109,22 @@ function Scene({
     controls.current?.target.copy(target)
     controls.current?.update()
   }, [camera, size.h])
+
+  // 물건 위에서 누르면 방 돌리기를 "먼저" 꺼야 함. 방 돌리기(OrbitControls)가 R3F보다 먼저
+  // 누르기를 받아서, 물건을 끄는 동안 방까지 같이 돌아가던 게 왔다갔다 튀던 진짜 원인
+  const grabbable = useRef<Group>(null)
+  useEffect(() => {
+    const picker = new Raycaster()
+    const capture = (e: PointerEvent) => {
+      if (e.button !== 0 || e.target !== gl.domElement || !grabbable.current || !controls.current) return
+      const rect = gl.domElement.getBoundingClientRect()
+      const ndc = new Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
+      picker.setFromCamera(ndc, camera)
+      if (picker.intersectObject(grabbable.current, true).length > 0) controls.current.enabled = false
+    }
+    window.addEventListener('pointerdown', capture, { capture: true })
+    return () => window.removeEventListener('pointerdown', capture, { capture: true })
+  }, [gl, camera])
 
   useEffect(() => {
     const move = (e: PointerEvent) => {
@@ -158,16 +181,17 @@ function Scene({
     }
 
     const d = drag.current!
-    const at = placeAt(d.item.item, raycaster.ray, layout, size, {
+    const latest = layoutRef.current
+    const at = placeAt(d.item.item, raycaster.ray, latest, size, {
       excludeId: d.item.id,
       offset: d.offset,
       rot: d.item.rot,
     })
     if (!at) return
     // 다른 가구에 막히면 거기서 멈추고 옆으로 미끄러짐
-    const current = layout.items.find((it) => it.id === d.item.id) ?? d.item
-    const { x, z } = slideTo(layout, current, at)
-    if (x === current.x && z === current.z && at.y === current.y) return
+    const { x, z } = slideTo(latest, { ...d.item, ...d.pos }, at, d.ignore)
+    if (x === d.pos.x && z === d.pos.z && at.y === d.pos.y) return
+    d.pos = { x, y: at.y, z }
     onMove([
       { id: d.item.id, patch: { ...at, x, z } },
       ...d.riders.map((r) => ({ id: r.id, patch: { x: Number((x + r.dx).toFixed(2)), z: Number((z + r.dz).toFixed(2)) } })),
@@ -184,7 +208,7 @@ function Scene({
       }
     }
     const riders = ridersOf(layout, item).map((r) => ({ id: r.id, dx: r.x - item.x, dz: r.z - item.z }))
-    drag.current = { item, offset, riders }
+    drag.current = { item, offset, riders, pos: { x: item.x, y: item.y, z: item.z }, ignore: overlappingWith(layout, item) }
     setDragging(true)
     if (controls.current) controls.current.enabled = false
     onDragStart()
@@ -219,6 +243,7 @@ function Scene({
         fadeDistance={100}
       />
 
+      <group ref={grabbable}>
       {layout.items.map((placed) => {
         const hidden = placed.when && !placed.when.includes(previewKind)
         return (
@@ -273,6 +298,7 @@ function Scene({
           <Character pose={spot.pose} hands={spot.hands} prop={spot.prop} seat={spot.seat} />
         </group>
       )}
+      </group>
     </>
   )
 }
@@ -293,12 +319,19 @@ function Selectable({
 
   useEffect(() => {
     // when 조건에 안 맞는 아이템(예: 밥그릇)이나 놓기 전 미리보기는 반투명하게
+    // 원래 투명한 재질(달팽이 통 플라스틱 등)은 원래 값을 기억해뒀다가 곱해서 씀
     ref.current?.traverse((o) => {
-      const m = (o as { material?: { transparent: boolean; opacity: number; depthWrite: boolean } }).material
+      const m = (o as { material?: { transparent: boolean; opacity: number; depthWrite: boolean; userData: Record<string, unknown> } })
+        .material
       if (!m) return
-      m.transparent = opacity < 1
-      m.opacity = opacity
-      m.depthWrite = opacity >= 1
+      const base = (m.userData.base ??= { transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite }) as {
+        transparent: boolean
+        opacity: number
+        depthWrite: boolean
+      }
+      m.transparent = base.transparent || opacity < 1
+      m.opacity = base.opacity * opacity
+      m.depthWrite = base.depthWrite && opacity >= 1
     })
   })
 
