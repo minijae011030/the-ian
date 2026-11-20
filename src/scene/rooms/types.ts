@@ -20,6 +20,8 @@ export type Spot = {
   /** sit일 때 엉덩이 높이 (의자 0.45, 침대 0.5) */
   seat?: number
   prop?: Prop
+  /** 이 자리를 준 가구 (에디터에서 캐릭터를 잡으면 이 가구를 옮김) */
+  source?: string
 }
 
 /**

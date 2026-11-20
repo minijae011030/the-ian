@@ -8,7 +8,7 @@ import { EditorScene } from './EditorScene'
 import { type Entry, ENTRIES, type Tab, TABS } from './entries'
 import { commitFiles, type GithubSettings, loadSettings, readFile, saveSettings } from './github'
 import { KINDS } from './kinds'
-import type { Placement } from './placement'
+import { type Placement, ridersOf } from './placement'
 import { useThumbnails } from './Thumbnails'
 
 const layoutPath = (roomId: string) => `public/data/layouts/${roomId}.json`
@@ -91,12 +91,6 @@ export function AdminApp() {
     [layout, remember, roomId],
   )
 
-  const patchItem = useCallback(
-    (id: string, patch: Partial<PlacedItem>, record = true) =>
-      update((l) => ({ ...l, items: l.items.map((it) => (it.id === id ? { ...it, ...patch } : it)) }), record),
-    [update],
-  )
-
   const undo = useCallback(() => {
     const prev = history.current[roomId]?.pop()
     if (prev) setLayouts((all) => ({ ...all, [roomId]: prev }))
@@ -116,9 +110,26 @@ export function AdminApp() {
     [layout, placing, update],
   )
 
+  const patchMany = useCallback(
+    (moves: { id: string; patch: Partial<PlacedItem> }[], record = true) => {
+      const byId = new Map(moves.map((m) => [m.id, m.patch]))
+      update((l) => ({ ...l, items: l.items.map((it) => (byId.has(it.id) ? { ...it, ...byId.get(it.id) } : it)) }), record)
+    },
+    [update],
+  )
+
+  /** 시계 방향 90도. 위에 얹힌 소품도 가구 중심을 기준으로 같이 돌림 */
   const turnSelected = useCallback(() => {
-    if (selected) patchItem(selected.id, { rot: (((selected.rot - 90) % 360) + 360) % 360 })
-  }, [selected, patchItem])
+    if (!selected || !layout) return
+    const spin = (rot: number) => (((rot - 90) % 360) + 360) % 360
+    const riders = ridersOf(layout, selected).map((r) => {
+      const dx = r.x - selected.x
+      const dz = r.z - selected.z
+      // y축 기준 -90도 회전: (dx, dz) → (-dz, dx)
+      return { id: r.id, patch: { x: round(selected.x - dz), z: round(selected.z + dx), rot: spin(r.rot) } }
+    })
+    patchMany([{ id: selected.id, patch: { rot: spin(selected.rot) } }, ...riders])
+  }, [selected, layout, patchMany])
 
   const removeSelected = useCallback(() => {
     if (!selectedId) return
@@ -297,7 +308,7 @@ export function AdminApp() {
               if (id) setPlacing(null)
             }}
             onDragStart={remember}
-            onMove={(id, patch) => patchItem(id, patch, false)}
+            onMove={(moves) => patchMany(moves, false)}
             onTurn={turnSelected}
             onRemove={removeSelected}
           />

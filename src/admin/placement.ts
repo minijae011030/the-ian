@@ -122,3 +122,15 @@ export function findOverlaps(layout: LayoutData) {
   }
   return overlapped
 }
+
+/** 가구 위에 얹힌 소품들 (책상 위 노트북·스탠드 등). 가구를 옮기거나 돌리면 같이 따라감 */
+export function ridersOf(layout: LayoutData, base: PlacedItem) {
+  const top = CATALOG[base.item]?.top
+  if (top === undefined) return []
+  const box = footprintBox(base)
+  return layout.items.filter((it) => {
+    if (it.id === base.id || CATALOG[it.item]?.place !== 'surface') return false
+    if (Math.abs(it.y - (base.y + top)) > 0.03) return false
+    return it.x >= box.minX && it.x <= box.maxX && it.z >= box.minZ && it.z <= box.maxZ
+  })
+}

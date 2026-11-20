@@ -98,6 +98,7 @@ export function findSpot(layout: LayoutData, kind: ActivityKind): Spot | null {
     prop: use.prop,
     seat: use.seat,
     position: [placed.x + offset.x, placed.y + offset.y, placed.z + offset.z],
+    source: placed.id,
     rotationY: rot + MathUtils.degToRad(use.facing),
   }
 }

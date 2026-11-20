@@ -88,7 +88,8 @@ export function Laptop({
   return (
     <group position={position} rotation-y={rotationY}>
       <Box size={[0.42, 0.02, 0.28]} position={[0, 0.01, 0]} color="#c9ccd2" />
-      <group position={[0, 0.02, 0.13]} rotation-x={-0.25}>
+      {/* 경첩(뒤쪽 모서리) 기준으로 화면을 뒤로 젖혀서 활짝 편 상태 */}
+      <group position={[0, 0.02, 0.13]} rotation-x={0.32}>
         <Box size={[0.42, 0.27, 0.015]} position={[0, 0.135, 0]} color="#c9ccd2" />
         <mesh position={[0, 0.135, -0.009]} rotation-y={Math.PI}>
           <planeGeometry args={[0.39, 0.24]} />

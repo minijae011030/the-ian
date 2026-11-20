@@ -10,7 +10,7 @@ import { PlacedItemMesh } from '../scene/rooms/PlacedItems'
 import { RoomShell } from '../scene/rooms/RoomShell'
 import type { LayoutData, PlacedItem, RoomSize } from '../scene/rooms/types'
 import { ActionBar } from './ActionBar'
-import { findOverlaps, type Placement, placeAt } from './placement'
+import { findOverlaps, type Placement, placeAt, ridersOf } from './placement'
 
 type Props = {
   size: RoomSize
@@ -22,7 +22,8 @@ type Props = {
   placing: { item: string; variant: string } | null
   onSelect: (id: string | null) => void
   onDragStart: () => void
-  onMove: (id: string, patch: Partial<PlacedItem>) => void
+  /** 끌기 중 이동. 가구 위 소품도 같이 옮겨서 여러 개가 한 번에 옴 */
+  onMove: (moves: { id: string; patch: Partial<PlacedItem> }[]) => void
   /** keepPlacing: Shift 누르고 클릭 → 같은 아이템을 계속 놓음 */
   onPlace: (at: Placement, keepPlacing: boolean) => void
   onTurn: () => void
@@ -71,7 +72,11 @@ function Scene({
   const raycaster = useThree((s) => s.raycaster)
   const pointer = useThree((s) => s.pointer)
   const gl = useThree((s) => s.gl)
-  const drag = useRef<{ item: PlacedItem; offset?: Vector3 } | null>(null)
+  const drag = useRef<{
+    item: PlacedItem
+    offset?: Vector3
+    riders: { id: string; dx: number; dz: number }[]
+  } | null>(null)
   const [ghost, setGhost] = useState<Placement | null>(null)
   const ghostRef = useRef<Placement | null>(null)
   const overlaps = useMemo(() => findOverlaps(layout), [layout])
@@ -135,7 +140,11 @@ function Scene({
 
     const d = drag.current!
     const at = placeAt(d.item.item, raycaster.ray, layout, size, { excludeId: d.item.id, offset: d.offset })
-    if (at) onMove(d.item.id, at)
+    if (!at) return
+    onMove([
+      { id: d.item.id, patch: at },
+      ...d.riders.map((r) => ({ id: r.id, patch: { x: Number((at.x + r.dx).toFixed(2)), z: Number((at.z + r.dz).toFixed(2)) } })),
+    ])
   })
 
   const startDrag = (item: PlacedItem) => {
@@ -147,7 +156,8 @@ function Scene({
         offset = hit.sub(new Vector3(item.x, 0, item.z))
       }
     }
-    drag.current = { item, offset }
+    const riders = ridersOf(layout, item).map((r) => ({ id: r.id, dx: r.x - item.x, dz: r.z - item.z }))
+    drag.current = { item, offset, riders }
     if (controls.current) controls.current.enabled = false
     onDragStart()
   }
@@ -206,7 +216,18 @@ function Scene({
       })()}
 
       {spot && (
-        <group position={spot.position} rotation-y={spot.rotationY}>
+        <group
+          position={spot.position}
+          rotation-y={spot.rotationY}
+          onPointerDown={(e) => {
+            // 캐릭터를 잡으면 캐릭터가 쓰는 가구(의자·침대…)를 잡은 걸로
+            const source = layout.items.find((it) => it.id === spot.source)
+            if (e.button !== 0 || placing || !source) return
+            e.stopPropagation()
+            onSelect(source.id)
+            startDrag(source)
+          }}
+        >
           <Character pose={spot.pose} hands={spot.hands} prop={spot.prop} seat={spot.seat} />
         </group>
       )}
