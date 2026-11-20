@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { BoxGeometry, Color, InstancedMesh, MeshBasicMaterial, Object3D } from 'three'
 import { environment } from '../environment'
+import { STOP_LINE } from './traffic/signals'
 import {
   BLOCK_SIZE,
   blockCenters,
@@ -33,9 +34,14 @@ function generate() {
     }
   }
 
-  for (const line of roadLines()) {
+  const lines = roadLines()
+  /** 교차로·횡단보도 구간이면 차선 점선·가로등 안 그림 */
+  const nearIntersection = (t: number, margin: number) => lines.some((c) => Math.abs(t - c) < STOP_LINE + margin)
+
+  for (const line of lines) {
     if (Math.abs(line) > LAMP_RANGE) continue
     for (let t = -LAMP_RANGE; t < LAMP_RANGE; t += DASH.length + DASH.gap) {
+      if (nearIntersection(t, DASH.length / 2)) continue
       // 가로 방향 도로(z = line)와 세로 방향 도로(x = line) 둘 다
       if (!isInsideLake(t, line, 2))
         dashes.push({ x: t, y: 0.02, z: line, sx: DASH.length, sy: 0.02, sz: 0.25 })
@@ -43,8 +49,10 @@ function generate() {
         dashes.push({ x: line, y: 0.02, z: t, sx: 0.25, sy: 0.02, sz: DASH.length })
     }
 
-    const edge = ROAD.width / 2 - 0.6
+    // 가로등은 보도 가장자리 (보행자 걷는 줄보다 바깥쪽)
+    const edge = ROAD.width / 2 + 0.25
     for (let t = -LAMP_RANGE; t < LAMP_RANGE; t += LAMP_GAP) {
+      if (nearIntersection(t, 1.5)) continue
       for (const [x, z] of [
         [t, line + edge],
         [line + edge, t],

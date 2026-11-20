@@ -5,6 +5,7 @@ import { Color } from 'three'
  * - darkness: 0(한낮) ~ 1(한밤). 가로등·차 불빛·별·창문 밝기에 씀
  * - cityLit: 주변 건물 창 중 불 켜진 비율 배수
  * - traffic: 차량 밀도 0~1 (출퇴근 피크, 새벽 거의 없음)
+ * - pedestrians: 보행자 밀도 0~1 (점심·퇴근길 북적, 새벽 몇 명)
  */
 type Keyframe = {
   hour: number
@@ -39,6 +40,12 @@ const TRAFFIC: [number, number][] = [
   [12, 0.6], [16, 0.55], [18, 1], [19.5, 0.85], [21, 0.45], [23, 0.28], [24, 0.18],
 ]
 
+/** [시각, 값] — 출근길·점심·퇴근 후 저녁이 제일 북적 */
+const PEDESTRIANS: [number, number][] = [
+  [0, 0.15], [2, 0.05], [5, 0.04], [7, 0.4], [8.5, 0.75], [10, 0.45], [12, 0.9], [13.5, 0.6],
+  [17, 0.6], [18.5, 1], [21, 0.7], [23, 0.3], [24, 0.15],
+]
+
 function lerpTable(table: [number, number][], hour: number) {
   for (let i = 0; i < table.length - 1; i++) {
     const [h0, v0] = table[i]
@@ -60,6 +67,7 @@ export const environment = {
   darkness: 0.65,
   cityLit: 1,
   traffic: 0.8,
+  pedestrians: 0.8,
 }
 
 export function updateEnvironment(hour: number) {
@@ -76,4 +84,5 @@ export function updateEnvironment(hour: number) {
   environment.darkness = k0.darkness + (k1.darkness - k0.darkness) * t
   environment.cityLit = lerpTable(CITY_LIT, hour)
   environment.traffic = lerpTable(TRAFFIC, hour)
+  environment.pedestrians = lerpTable(PEDESTRIANS, hour)
 }

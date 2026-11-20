@@ -20,7 +20,8 @@ export const BENCHES: [number, number][] = [
 
 export const BOLLARDS: [number, number][] = [-2.4, -1.2, 0, 1.2, 2.4].map((x) => [x, 12.1])
 
-export const BUS_STOP: [number, number] = [9.6, 11.4]
+/** 보행자 길(블록 끝에서 0.55 안쪽)에 안 걸리게 살짝 안으로 */
+export const BUS_STOP: [number, number] = [9.6, 10.8]
 
 /** 정면 왼쪽 모퉁이. 팔이 왼쪽 도로 위로 뻗음 */
-export const ROAD_SIGN: [number, number] = [-12, 11.9]
+export const ROAD_SIGN: [number, number] = [-12.3, 12.3]

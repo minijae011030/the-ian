@@ -9,6 +9,11 @@ export const ROAD = { spacing: 34, width: 9 }
 export const BLOCK_SIZE = ROAD.spacing - ROAD.width
 export const SIDEWALK_HEIGHT = 0.2
 
+/** 차선: 도로 중심선에서 진행 방향 오른쪽으로 이만큼 (우측통행) */
+export const LANE = { offset: 1.7 }
+
+/** 보행자가 걷는 줄: 블록 가장자리에서 이만큼 안쪽 */
+export const WALKWAY_INSET = 0.55
 /** 도로 중심선 좌표 목록 (±17, ±51, ...) */
 export function roadLines() {
   const lines: number[] = []
