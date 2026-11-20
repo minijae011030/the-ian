@@ -1,22 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ActivityKind, ROOMS } from '../data/rooms'
-import { CATALOG, type ItemDef } from '../items/catalog'
-import { FLOORS } from '../items/floors'
 import { defaultLayout, fetchLayout, roomSize } from '../scene/rooms/layoutData'
 import type { LayoutData, PlacedItem } from '../scene/rooms/types'
 import { EditorScene } from './EditorScene'
-import type { Placement } from './placement'
-import { ItemInspector } from './ItemInspector'
-import { KINDS } from './kinds'
+import { type Entry, ENTRIES, type Tab, TABS } from './entries'
 import { commitFiles, type GithubSettings, loadSettings, readFile, saveSettings } from './github'
-
-
-const CATEGORY_LABEL: Record<ItemDef['category'], string> = {
-  furniture: '가구',
-  decor: '꾸미기',
-  small: '소품',
-  wall: '벽',
-}
+import { KINDS } from './kinds'
+import type { Placement } from './placement'
+import { useThumbnails } from './Thumbnails'
 
 const layoutPath = (roomId: string) => `public/data/layouts/${roomId}.json`
 const round = (v: number) => Math.round(v * 100) / 100
@@ -29,7 +20,10 @@ function serialize(layout: LayoutData) {
   return `{\n  "version": 1,\n  "wall": ${JSON.stringify(layout.wall)},\n  "floor": ${JSON.stringify(layout.floor)},\n  "items": [\n    ${items.join(',\n    ')}\n  ]\n}\n`
 }
 
-/** 방꾸 에디터. 방 고르기 → 아이템 놓고 옮기기 → 저장(GitHub 커밋) */
+/**
+ * 방꾸 에디터 (파니룸 스타일).
+ * 위: 방 · 아래: 아이템 상자. 상자에서 고르고 → 방에 클릭해서 놓고 → 끌어서 옮기고 → 방향/빼기
+ */
 export function AdminApp() {
   const [roomId, setRoomId] = useState(ROOMS[0].id)
   const [layouts, setLayouts] = useState<Record<string, LayoutData>>({})
@@ -37,11 +31,14 @@ export function AdminApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<ActivityKind>('work')
   const [view, setView] = useState(0)
-  const [placing, setPlacing] = useState<string | null>(null)
+  const [placing, setPlacing] = useState<{ item: string; variant: string } | null>(null)
+  const [tab, setTab] = useState<Tab>('all')
+  const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState<GithubSettings>(loadSettings)
   const [status, setStatus] = useState<{ text: string; error?: boolean; url?: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const history = useRef<Record<string, LayoutData[]>>({})
+  const { thumbs, baker } = useThumbnails()
 
   const room = ROOMS.find((r) => r.id === roomId)!
   const size = useMemo(() => roomSize(room), [room])
@@ -103,32 +100,23 @@ export function AdminApp() {
     if (prev) setLayouts((all) => ({ ...all, [roomId]: prev }))
   }, [roomId])
 
-  const uniqueId = (base: string) => {
-    let n = 1
-    while (layout?.items.some((it) => it.id === `${base}-${n}`)) n++
-    return `${base}-${n}`
-  }
-
-  /** 놓기 모드에서 클릭한 자리에 아이템 추가. Shift 누른 채 클릭하면 같은 걸 계속 놓을 수 있음 */
+  /** 방에 클릭한 자리에 놓기. Shift+클릭이면 같은 걸 계속 놓음 */
   const placeItem = useCallback(
-    (itemId: string, at: Placement, keepPlacing: boolean) => {
-      const def = CATALOG[itemId]
+    (at: Placement, keepPlacing: boolean) => {
+      if (!placing) return
       let n = 1
-      while (layout?.items.some((it) => it.id === `${itemId}-${n}`)) n++
-      const placed: PlacedItem = { id: `${itemId}-${n}`, item: itemId, rot: 0, ...at, variant: def.variants[0] }
+      while (layout?.items.some((it) => it.id === `${placing.item}-${n}`)) n++
+      const placed: PlacedItem = { id: `${placing.item}-${n}`, item: placing.item, variant: placing.variant, rot: 0, ...at }
       update((l) => ({ ...l, items: [...l.items, placed] }))
       setSelectedId(placed.id)
       if (!keepPlacing) setPlacing(null)
     },
-    [layout, update],
+    [layout, placing, update],
   )
 
-  const duplicateSelected = () => {
-    if (!selected) return
-    const copy = { ...selected, id: uniqueId(selected.item), x: round(Math.min(size.w / 2, selected.x + 0.3)) }
-    update((l) => ({ ...l, items: [...l.items, copy] }))
-    setSelectedId(copy.id)
-  }
+  const turnSelected = useCallback(() => {
+    if (selected) patchItem(selected.id, { rot: (((selected.rot - 90) % 360) + 360) % 360 })
+  }, [selected, patchItem])
 
   const removeSelected = useCallback(() => {
     if (!selectedId) return
@@ -136,45 +124,44 @@ export function AdminApp() {
     setSelectedId(null)
   }, [selectedId, update])
 
-  // 단축키
+  /** 상자 칸 누르기: 물건은 놓기 모드, 벽지·바닥은 바로 바뀜 */
+  const pick = (entry: Entry) => {
+    setSelectedId(null)
+    if (entry.kind === 'wall') update((l) => ({ ...l, wall: entry.color }))
+    else if (entry.kind === 'floor') update((l) => ({ ...l, floor: entry.floor }))
+    else {
+      const same = placing?.item === entry.item && placing.variant === entry.variant
+      setPlacing(same ? null : { item: entry.item, variant: entry.variant })
+    }
+  }
+
+  const inUse = (entry: Entry) => {
+    if (!layout) return false
+    if (entry.kind === 'wall') return layout.wall === entry.color
+    if (entry.kind === 'floor') return layout.floor === entry.floor
+    return layout.items.some((it) => it.item === entry.item && (it.variant ?? '') === entry.variant)
+  }
+
+  // 단축키 (안내 없이 조용히): ⌘Z 되돌리기, R 방향, Delete 빼기, Esc 취소
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('input, select, textarea')) return
-      const mod = e.metaKey || e.ctrlKey
-      if (mod && e.key.toLowerCase() === 'z') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         undo()
-        return
-      }
-      if (e.key === 'Escape') {
+      } else if (e.key === 'Escape') {
         setPlacing(null)
         setSelectedId(null)
-        return
-      }
-      if (!selected) return
-      const step = e.shiftKey ? 0.25 : 0.05
-      const nudge: Record<string, Partial<PlacedItem>> = {
-        ArrowLeft: { x: round(selected.x - step) },
-        ArrowRight: { x: round(selected.x + step) },
-        ArrowUp: { z: round(selected.z - step) },
-        ArrowDown: { z: round(selected.z + step) },
-      }
-      if (nudge[e.key]) {
-        e.preventDefault()
-        patchItem(selected.id, nudge[e.key])
       } else if (e.key === 'r' || e.key === 'R') {
-        patchItem(selected.id, { rot: (((selected.rot + (e.shiftKey ? -90 : 90)) % 360) + 360) % 360 })
+        turnSelected()
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
         removeSelected()
-      } else if (mod && e.key.toLowerCase() === 'd') {
-        e.preventDefault()
-        duplicateSelected()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  })
+  }, [undo, turnSelected, removeSelected])
 
   // 저장 안 한 채로 나가려 하면 경고
   useEffect(() => {
@@ -187,17 +174,18 @@ export function AdminApp() {
 
   const save = async () => {
     if (!settings.token) {
-      setStatus({ text: '저장하려면 GitHub 토큰을 넣어줘', error: true })
+      setShowSettings(true)
+      setStatus({ text: '토큰 없음', error: true })
       return
     }
     setSaving(true)
-    setStatus({ text: '커밋하는 중…' })
+    setStatus({ text: '저장 중…' })
     try {
       const names = dirtyIds.map((id) => ROOMS.find((r) => r.id === id)?.name ?? id)
       const files = dirtyIds.map((id) => ({ path: layoutPath(id), content: serialize(layouts[id]) }))
       const url = await commitFiles(settings, files, `data(room): update ${names.join(', ')}`)
       setSaved((prev) => ({ ...prev, ...Object.fromEntries(files.map((f, i) => [dirtyIds[i], f.content])) }))
-      setStatus({ text: '저장 완료. 1~2분 뒤 사이트에 반영돼.', url })
+      setStatus({ text: '저장됨', url })
     } catch (e) {
       setStatus({ text: `저장 실패: ${(e as Error).message}`, error: true })
     } finally {
@@ -211,48 +199,82 @@ export function AdminApp() {
     saveSettings(next)
   }
 
-  const byCategory = Object.entries(CATALOG).reduce<Record<string, [string, ItemDef][]>>((acc, entry) => {
-    ;(acc[entry[1].category] ??= []).push(entry)
-    return acc
-  }, {})
+  const shown = ENTRIES.filter((e) => (tab === 'all' ? e.kind === 'object' : e.tab === tab))
 
   return (
     <div className="admin">
-      <aside className="panel">
-        <h2>방</h2>
-        <div className="list">
-          {ROOMS.map((r) => (
-            <button
-              key={r.id}
-              className={`${r.id === roomId ? 'active' : ''} ${dirtyIds.includes(r.id) ? 'dirty' : ''}`}
-              onClick={() => {
-                setRoomId(r.id)
-                setSelectedId(null)
-              }}
-            >
-              {r.name} <span style={{ opacity: 0.5 }}>· {r.floor}층 {r.bays}칸</span>
-            </button>
-          ))}
+      <header className="topbar">
+        <div className="room-picker">
+          <select
+            value={roomId}
+            onChange={(e) => {
+              setRoomId(e.target.value)
+              setSelectedId(null)
+              setPlacing(null)
+            }}
+          >
+            {ROOMS.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+                {dirtyIds.includes(r.id) ? ' •' : ''}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {Object.entries(byCategory).map(([category, items]) => (
-          <div key={category}>
-            <h2>{CATEGORY_LABEL[category as ItemDef['category']]}</h2>
-            <div className="chips">
-              {items.map(([id, def]) => (
-                <button
-                  key={id}
-                  className={placing === id ? 'active' : ''}
-                  onClick={() => setPlacing(placing === id ? null : id)}
-                  disabled={!layout}
-                >
-                  {def.name}
-                </button>
-              ))}
+        <div className="tools">
+          <button onClick={() => setView((v) => (v + 3) % 4)}>⟲</button>
+          <button onClick={() => setView((v) => (v + 1) % 4)}>⟳</button>
+          <button onClick={undo}>되돌리기</button>
+          <select value={previewKind} onChange={(e) => setPreviewKind(e.target.value as ActivityKind)}>
+            {KINDS.map((k) => (
+              <option key={k.kind} value={k.kind}>
+                {k.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="save-area">
+          {status && (
+            <span className={`status ${status.error ? 'error' : ''}`}>
+              {status.url ? (
+                <a href={status.url} target="_blank" rel="noreferrer">
+                  {status.text}
+                </a>
+              ) : (
+                status.text
+              )}
+            </span>
+          )}
+          <button className="save" disabled={saving || dirtyIds.length === 0} onClick={save}>
+            미니룸 저장하기
+          </button>
+          <button className="gear" onClick={() => setShowSettings((v) => !v)}>
+            ⚙
+          </button>
+          {showSettings && (
+            <div className="settings">
+              <label>
+                레포
+                <input value={settings.repo} onChange={(e) => updateSettings({ repo: e.target.value.trim() })} />
+              </label>
+              <label>
+                브랜치
+                <input value={settings.branch} onChange={(e) => updateSettings({ branch: e.target.value.trim() })} />
+              </label>
+              <label>
+                토큰
+                <input
+                  type="password"
+                  value={settings.token}
+                  onChange={(e) => updateSettings({ token: e.target.value.trim() })}
+                />
+              </label>
             </div>
-          </div>
-        ))}
-      </aside>
+          )}
+        </div>
+      </header>
 
       <main className="stage">
         {layout && (
@@ -264,114 +286,42 @@ export function AdminApp() {
             view={view}
             placing={placing}
             onPlace={placeItem}
-            onSelect={setSelectedId}
+            onSelect={(id) => {
+              setSelectedId(id)
+              if (id) setPlacing(null)
+            }}
             onDragStart={remember}
             onMove={(id, patch) => patchItem(id, patch, false)}
-          />
-        )}
-        <div className="toolbar">
-          <button onClick={() => setView((v) => (v + 3) % 4)}>⟲ 시점</button>
-          <button onClick={() => setView((v) => (v + 1) % 4)}>시점 ⟳</button>
-          <button onClick={undo}>되돌리기</button>
-        </div>
-        <div className="keys">
-          {placing ? '클릭해서 놓기 · Shift+클릭 여러 개 · Esc 취소 · ' : ''}드래그 이동 · R 회전 · 방향키 미세조정(Shift 크게) · ⌘D 복제 · Delete 삭제 · ⌘Z 되돌리기 · 오른쪽 드래그 화면 이동
-        </div>
-      </main>
-
-      <aside className="panel right">
-        {selected ? (
-          <ItemInspector
-            item={selected}
-            size={size}
-            onChange={(patch, record = true) => patchItem(selected.id, patch, record)}
-            onScrubStart={remember}
-            onDuplicate={duplicateSelected}
+            onTurn={turnSelected}
             onRemove={removeSelected}
           />
-        ) : (
-          <div className="howto">
-            <p className="q">이렇게 꾸며</p>
-            <ol>
-              <li>왼쪽에서 방을 골라</li>
-              <li>물건을 누르고, 방에서 놓을 곳을 클릭</li>
-              <li>놓은 물건은 끌어서 옮기거나 클릭해서 여기서 고쳐</li>
-              <li>다 됐으면 맨 아래 저장</li>
-            </ol>
-          </div>
         )}
+      </main>
 
-        <h2>방 설정</h2>
-        {layout && (
-          <div className="field">
-            <label>벽 색</label>
-            <input type="color" value={layout.wall} onChange={(e) => update((l) => ({ ...l, wall: e.target.value }))} />
-          </div>
-        )}
-        {layout && (
-          <div className="field">
-            <label>바닥</label>
-            <select value={layout.floor} onChange={(e) => update((l) => ({ ...l, floor: e.target.value }))}>
-              {Object.entries(FLOORS).map(([id, f]) => (
-                <option key={id} value={id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <h2>미리보기</h2>
-        <div className="field">
-          <label>하는 일</label>
-          <select value={previewKind} onChange={(e) => setPreviewKind(e.target.value as ActivityKind)}>
-            {KINDS.map((k) => (
-              <option key={k.kind} value={k.kind}>
-                {k.label}
-              </option>
-            ))}
-          </select>
+      <section className="itembox">
+        <nav className="tabs">
+          {TABS.map((t) => (
+            <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </nav>
+        <div className="grid">
+          {shown.map((entry) => {
+            const active = placing && entry.kind === 'object' && placing.item === entry.item && placing.variant === entry.variant
+            return (
+              <button key={entry.key} className={`cell ${active ? 'active' : ''}`} onClick={() => pick(entry)}>
+                <span className="thumb">
+                  {thumbs[entry.key] ? <img src={thumbs[entry.key]} alt="" /> : null}
+                  {inUse(entry) && <em>사용중</em>}
+                </span>
+                <span className="name">{entry.name}</span>
+              </button>
+            )
+          })}
         </div>
-        <p className="hint">캐릭터는 그 일을 할 수 있는 가구(침대·의자·화장대…)로 자동으로 가.</p>
-
-        <h2>저장</h2>
-        <div className="field">
-          <label>레포</label>
-          <input value={settings.repo} onChange={(e) => updateSettings({ repo: e.target.value.trim() })} />
-        </div>
-        <div className="field">
-          <label>브랜치</label>
-          <input value={settings.branch} onChange={(e) => updateSettings({ branch: e.target.value.trim() })} />
-        </div>
-        <div className="field">
-          <label>토큰</label>
-          <input
-            type="password"
-            placeholder="github_pat_…"
-            value={settings.token}
-            onChange={(e) => updateSettings({ token: e.target.value.trim() })}
-          />
-        </div>
-        <button className="btn primary" disabled={saving || dirtyIds.length === 0} onClick={save}>
-          {dirtyIds.length ? `저장 (${dirtyIds.length}개 방 커밋)` : '바뀐 거 없음'}
-        </button>
-        {layout && (
-          <button className="btn ghost" onClick={() => navigator.clipboard.writeText(serialize(layout))}>
-            이 방 JSON 복사
-          </button>
-        )}
-        {status && (
-          <p className={`status ${status.error ? 'error' : ''}`}>
-            {status.text}{' '}
-            {status.url && (
-              <a href={status.url} target="_blank" rel="noreferrer">
-                커밋 보기
-              </a>
-            )}
-          </p>
-        )}
-        <p className="hint">토큰은 이 브라우저에만 저장돼. 이 레포 Contents 쓰기 권한만 준 fine-grained 토큰을 써.</p>
-      </aside>
+      </section>
+      {baker}
     </div>
   )
 }

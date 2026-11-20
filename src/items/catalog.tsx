@@ -67,14 +67,14 @@ export const VARIANT_INFO: Record<string, { name: string; color?: string }> = {
   beige: { name: '베이지', color: RUGS.beige },
   sand: { name: '모래색', color: RUGS.sand },
   wine: { name: '와인', color: RUGS.wine },
-  short: { name: '짧은 거' },
-  long: { name: '긴 거' },
+  short: { name: '작은' },
+  long: { name: '큰' },
   suits: { name: '정장' },
   casual: { name: '평상복' },
-  job: { name: '취준 책' },
-  plain: { name: '그냥 책' },
-  blank: { name: '빈 화면' },
-  'cover-letter': { name: '자소서' },
+  job: { name: '취준' },
+  plain: { name: '평범한' },
+  blank: { name: '꺼진' },
+  'cover-letter': { name: '자소서 띄운' },
 }
 
 export const CATALOG: Record<string, ItemDef> = {

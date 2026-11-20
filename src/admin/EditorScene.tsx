@@ -9,6 +9,7 @@ import { findSpot } from '../scene/rooms/layoutData'
 import { PlacedItemMesh } from '../scene/rooms/PlacedItems'
 import { RoomShell } from '../scene/rooms/RoomShell'
 import type { LayoutData, PlacedItem, RoomSize } from '../scene/rooms/types'
+import { ActionBar } from './ActionBar'
 import { findOverlaps, type Placement, placeAt } from './placement'
 
 type Props = {
@@ -17,13 +18,15 @@ type Props = {
   selectedId: string | null
   previewKind: ActivityKind
   view: number
-  /** 팔레트에서 고른, 아직 안 놓은 아이템 */
-  placing: string | null
+  /** 아이템 상자에서 고른, 아직 안 놓은 물건 */
+  placing: { item: string; variant: string } | null
   onSelect: (id: string | null) => void
   onDragStart: () => void
   onMove: (id: string, patch: Partial<PlacedItem>) => void
   /** keepPlacing: Shift 누르고 클릭 → 같은 아이템을 계속 놓음 */
-  onPlace: (itemId: string, at: Placement, keepPlacing: boolean) => void
+  onPlace: (at: Placement, keepPlacing: boolean) => void
+  onTurn: () => void
+  onRemove: () => void
 }
 
 /**
@@ -31,17 +34,19 @@ type Props = {
  * 벽·천장은 안쪽 면만 그려서 카메라 쪽 벽은 자동으로 안 보임 (방꾸 게임처럼 잘린 방)
  */
 export function EditorScene(props: Props) {
+  // 방금 놓은 클릭이 빈 곳 클릭(선택 해제)으로도 잡히지 않게
+  const placedAt = useRef(0)
   return (
     <Canvas
       orthographic
       camera={{ zoom: 140, near: -100, far: 100 }}
-      onPointerMissed={() => !props.placing && props.onSelect(null)}
+      onPointerMissed={() => !props.placing && performance.now() - placedAt.current > 400 && props.onSelect(null)}
       style={{ cursor: props.placing ? 'copy' : 'default' }}
     >
       <color attach="background" args={['#0d1017']} />
       <ambientLight intensity={0.9} />
       <directionalLight position={[3, 6, 4]} intensity={1.2} />
-      <Scene {...props} />
+      <Scene {...props} placedAt={placedAt} />
     </Canvas>
   )
 }
@@ -57,7 +62,10 @@ function Scene({
   onDragStart,
   onMove,
   onPlace,
-}: Props) {
+  onTurn,
+  onRemove,
+  placedAt,
+}: Props & { placedAt: React.RefObject<number> }) {
   const controls = useRef<React.ComponentRef<typeof OrbitControls>>(null)
   const camera = useThree((s) => s.camera)
   const raycaster = useThree((s) => s.raycaster)
@@ -67,6 +75,15 @@ function Scene({
   const [ghost, setGhost] = useState<Placement | null>(null)
   const ghostRef = useRef<Placement | null>(null)
   const overlaps = useMemo(() => findOverlaps(layout), [layout])
+
+  // 화면 크기에 맞춰 방이 꽉 차게 확대 (창을 줄이면 방도 같이 작아짐)
+  const viewport = useThree((s) => s.size)
+  useEffect(() => {
+    const spread = Math.SQRT1_2 * (size.w + size.d) // 비스듬히 봤을 때 방 가로폭
+    const tall = size.h * 0.87 + spread * 0.5
+    camera.zoom = Math.max(40, Math.min((viewport.width * 0.85) / spread, (viewport.height * 0.78) / tall))
+    camera.updateProjectionMatrix()
+  }, [camera, viewport.width, viewport.height, size.w, size.d, size.h])
 
   // 시점: 45도씩 돌린 4방향 중 하나
   useEffect(() => {
@@ -97,18 +114,19 @@ function Scene({
     }
     const down = (e: PointerEvent) => {
       if (e.button !== 0 || !ghostRef.current) return
-      onPlace(placing, ghostRef.current, e.shiftKey)
+      placedAt.current = performance.now()
+      onPlace(ghostRef.current, e.shiftKey)
     }
     gl.domElement.addEventListener('pointerdown', down)
     return () => gl.domElement.removeEventListener('pointerdown', down)
-  }, [placing, gl, onPlace])
+  }, [placing, gl, onPlace, placedAt])
 
   useFrame(() => {
     if (!drag.current && !placing) return
     raycaster.setFromCamera(pointer, camera)
 
     if (placing) {
-      const at = placeAt(placing, raycaster.ray, layout, size)
+      const at = placeAt(placing.item, raycaster.ray, layout, size)
       const changed = JSON.stringify(at) !== JSON.stringify(ghostRef.current)
       ghostRef.current = at
       if (changed) setGhost(at)
@@ -139,7 +157,7 @@ function Scene({
 
   return (
     <>
-      <OrbitControls ref={controls} enableRotate={false} enableDamping={false} screenSpacePanning minZoom={60} maxZoom={400} />
+      <OrbitControls ref={controls} enableRotate={false} enableZoom={false} enableDamping={false} screenSpacePanning />
       <RoomShell size={size} lightOn={lit} wall={layout.wall} floor={layout.floor} />
       <Grid
         args={[size.w, size.d]}
@@ -174,11 +192,18 @@ function Scene({
       {placing && ghost && (
         <Selectable outline="#8ab4ff" opacity={0.55} onPointerDown={() => {}}>
           <PlacedItemMesh
-            placed={{ id: '__ghost', item: placing, rot: 0, ...ghost, variant: CATALOG[placing]?.variants[0] }}
+            placed={{ id: '__ghost', item: placing.item, variant: placing.variant, rot: 0, ...ghost }}
             lit={lit}
           />
         </Selectable>
       )}
+
+      {selectedId && !placing && (() => {
+        const item = layout.items.find((it) => it.id === selectedId)
+        return item ? (
+          <ActionBar item={item} onTurn={onTurn} onRemove={onRemove} />
+        ) : null
+      })()}
 
       {spot && (
         <group position={spot.position} rotation-y={spot.rotationY}>
