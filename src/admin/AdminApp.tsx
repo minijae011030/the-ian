@@ -197,9 +197,10 @@ export function AdminApp() {
     setSaving(true)
     setStatus({ text: '저장 중…' })
     try {
-      const names = dirtyIds.map((id) => ROOMS.find((r) => r.id === id)?.name ?? id)
       const files = dirtyIds.map((id) => ({ path: layoutPath(id), content: serialize(layouts[id]) }))
-      const url = await commitFiles(settings, files, `data(room): update ${names.join(', ')}`)
+      // 예) "data: update job room layout", "data: update job, dev room layouts"
+      const message = `data: update ${dirtyIds.join(', ')} room ${dirtyIds.length > 1 ? 'layouts' : 'layout'}`
+      const url = await commitFiles(settings, files, message)
       setSaved((prev) => ({ ...prev, ...Object.fromEntries(files.map((f, i) => [dirtyIds[i], f.content])) }))
       setStatus({ text: '저장됨', url })
     } catch (e) {
